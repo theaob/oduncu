@@ -1,4 +1,4 @@
-# Oduncu — Game Design Document (v0.1)
+# Oduncu — Game Design Document (v0.2)
 
 *Working title. "Oduncu" is Turkish for woodcutter.*
 
@@ -309,74 +309,112 @@ triangle, walls, siege, monks, trade, castles, trebuchets, a full match, and a f
 
 ### 12.1 Engine
 
-**Recommendation: Godot 4 with C# for game logic.** Reasons: free and open source, no
-runtime fees, first-class iOS and Android export, strong 2D and lightweight 3D, and C#
-gives the performance and tooling needed for a deterministic simulation.
+**Decision: Unity 6 (LTS) with C#.** Chosen over Godot 4 and JavaScript stacks for four reasons:
 
-Alternative: Unity with Burst and the Jobs system. Better asset-store coverage and more
-mobile-specific profiling tools, at the cost of licensing and a heavier build.
-Switch to Unity only if the team already has deep Unity experience.
+1. **Photon Quantum** provides a fixed-point, deterministic simulation with prediction and
+   rollback, built for exactly this kind of lockstep game. It removes the riskiest piece of
+   custom engineering from the plan.
+2. **Burst and the Jobs system** make flow-field pathfinding, fog-of-war updates and
+   large-group movement cheap on mobile CPUs.
+3. **Mature mobile tooling**: Profiler, Memory Profiler, Frame Debugger, Adaptive
+   Performance for thermal throttling, Addressables for asset streaming, IL2CPP builds.
+4. **Hiring and ecosystem**: the largest pool of mobile game engineers and RTS reference
+   material.
+
+Costs accepted: Unity is free below the Personal revenue threshold and paid per seat above
+it; Quantum is free at low concurrency and paid beyond. Both are budgeted as known line
+items rather than risks.
+
+Options considered and rejected: Godot 4 (C# mobile export too immature for the
+simulation), TypeScript with PixiJS or Phaser in a Capacitor WebView (viable only with 2D
+rendering, loses thermal and performance APIs), Cocos Creator (native and capable, but
+smaller English-language community and no deterministic networking framework).
 
 ### 12.2 Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│  Presentation (Godot scenes, input, audio, UI)           │
-│  - reads sim state, interpolates between ticks           │
+│  Presentation (Unity scenes, input, audio, UI Toolkit)   │
+│  - reads sim state each frame, interpolates between ticks│
 │  - turns gestures into Commands                          │
 ├──────────────────────────────────────────────────────────┤
-│  Simulation (pure C#, no Godot dependency)               │
-│  - fixed timestep 10 ticks/s, integer / fixed-point math │
+│  Simulation (Quantum: pure C#, fixed-point, no UnityEngine)│
+│  - fixed timestep 10 ticks/s                             │
 │  - entities, pathfinding, combat, economy, fog, tech     │
 │  - input: ordered list of Commands per tick              │
 │  - output: deterministic state; hashable for desync check│
 ├──────────────────────────────────────────────────────────┤
-│  Data (JSON/CSV: units, buildings, techs, civs, maps)    │
+│  Data (ScriptableObject assets generated from CSV/JSON:  │
+│        units, buildings, techs, civs, map templates)     │
 └──────────────────────────────────────────────────────────┘
 ```
 
-The simulation has no reference to the engine so it can be unit tested headless, run on a
-server for validation, and replayed from a command log.
+Rules that keep the simulation portable and testable:
+
+- The simulation assembly has no reference to `UnityEngine`. It is a plain C# class
+  library compiled into the Unity project and into a separate .NET test project.
+- All simulation maths uses Quantum's `FP` fixed-point type. `float` and `double` are
+  banned in the simulation assembly by an analyzer rule.
+- Presentation never mutates simulation state; it only submits Commands.
+- The AI submits Commands through the same interface as a human player.
+
+If Quantum is dropped later (cost, licensing), the same boundary allows a hand-written
+fixed-point sim to replace it without touching presentation.
 
 ### 12.3 Determinism and multiplayer
 
-- Lockstep: each client runs the full simulation; only Commands are sent, through a relay
-  server, and executed 2 to 3 ticks after issue. This is how AoE2 itself works.
-- Fixed-point maths everywhere in the simulation (no `float`); state hash exchanged every
-  second to detect desync.
-- Reconnect: the relay buffers commands for 60 seconds; a dropped client fast-forwards on return.
+- Lockstep with prediction and rollback via Quantum: each client runs the full
+  simulation; only Commands cross the network through Photon's relay. This is the same
+  model AoE2 used, with rollback added so the local player's commands feel instant.
+- State hash exchanged every second to detect desync; a desync ends the match for the
+  offending client with a replay file attached to telemetry.
+- Reconnect: Quantum snapshots let a dropped client rejoin mid-match within 60 seconds.
 - Replays and the daily challenge come for free from the command log.
-- Matchmaking, accounts and ladders are a small HTTP service; the relay is a stateless
-  WebSocket server. No game logic runs server-side in v1.
+- Matchmaking, accounts and ladders: Unity Gaming Services (Authentication, Lobby,
+  Leaderboards) or a small HTTP service, decided at M3. No custom game logic runs
+  server-side in v1.
 
 ### 12.4 Pathfinding and performance
 
-- Grid A* for single units; flow fields for groups of more than 8 units to keep large
-  moves cheap.
-- Budget: 4 players × 75 units + ~400 buildings and trees at 10 ticks/s on a 2020 mid-range
-  phone with the simulation under 4 ms per tick.
-- Rendering target: 60 fps on mid-range, 30 fps floor on 2018 low-end devices.
-- Thermal: cap frame rate to 30 fps automatically when the device reports thermal pressure.
+- Grid A* for single units; flow fields for groups of more than 8 units. Both run inside
+  the simulation in fixed-point; Burst-compiled jobs are used only where Quantum allows
+  deterministic parallelism (field generation, fog recomputation).
+- Budget: 4 players × 75 units + ~400 buildings and trees at 10 ticks/s on a 2020
+  mid-range phone with the simulation under 4 ms per tick.
+- Rendering: URP, GPU instancing for units and trees, one draw call per unit type where
+  possible, 60 fps on mid-range, 30 fps floor on 2018 low-end devices.
+- Thermal: Adaptive Performance drops to 30 fps and halves shadow resolution under
+  thermal warning; the simulation tick rate is never reduced.
+- Memory: Addressables load one civilization's assets per match; target under 400 MB
+  resident on iOS.
 
 ### 12.5 Art direction
 
-Low-poly 3D models with a fixed 3/4 isometric camera and flat-shaded textures. One model
-and one animation set per unit serves all facings, which is far cheaper than AoE2-style
-pre-rendered sprites that need 8 directions × every animation. Zoom levels work without
-re-authoring. Buildings get three damage states.
+Low-poly 3D models with a fixed 3/4 isometric camera and flat-shaded textures in URP.
+One model and one animation set per unit serves all facings, which is far cheaper than
+AoE2-style pre-rendered sprites that need 8 directions × every animation. Zoom levels
+work without re-authoring. Buildings get three damage states. Shadows are a single
+blob-shadow decal on low-end devices.
 
 ### 12.6 Repository layout (proposed)
 
 ```
 oduncu/
-  docs/            design docs, this file
-  sim/             engine-independent simulation (C# class library)
-  sim.tests/       headless unit and determinism tests
-  game/            Godot project: scenes, scripts, UI, assets
-  data/            unit / building / tech / civ definitions
-  tools/           map generator CLI, balance spreadsheet exporter
-  server/          relay and matchmaking services
+  docs/                     design docs, this file
+  Oduncu.Unity/             Unity project
+    Assets/
+      Sim/                  simulation assembly (asmdef, no UnityEngine ref)
+      Game/                 presentation: scenes, prefabs, input, UI Toolkit
+      Data/                 ScriptableObjects and CSV sources for units, techs, civs
+      Art/                  models, animations, materials, audio
+    Packages/
+    ProjectSettings/
+  Oduncu.Sim.Tests/         headless .NET test project referencing Assets/Sim sources
+  tools/                    map generator CLI, balance spreadsheet exporter
 ```
+
+Unity version is pinned in `ProjectSettings/ProjectVersion.txt`; the repo uses Git LFS
+for binary assets and a `.gitignore` for `Library/`, `Temp/`, `Logs/` and `Build/`.
 
 ---
 
@@ -399,7 +437,7 @@ They are rough and should be re-planned after milestone 0.
 
 | Milestone | Target | Exit criteria |
 |---|---|---|
-| M0 Prototype | Week 8 | Headless sim with villagers, one resource, one building, one unit, A* pathing, combat. Godot shell with tap-to-move on a phone. Determinism test passes 10,000 ticks. |
+| M0 Prototype | Week 8 | Unity project set up with Quantum, Git LFS and CI build for Android. Headless sim with villagers, one resource, one building, one unit, A* pathing, combat. Tap-to-move on a phone. Determinism test passes 10,000 ticks on two devices with identical hashes. |
 | M1 Vertical slice | Week 20 | All four ages, full unit roster for one civ, one map template, Standard AI, complete touch UI. Internal playtests reach a 15-minute match. |
 | M2 Content | Week 30 | Four civs, three map templates, 12 campaign missions, Easy to Brutal AI, save and load, tutorial, audio. |
 | M3 Multiplayer | Week 42 | Relay server, 1v1 and 2v2, reconnect, replays, desync telemetry. Closed beta of 200 players. |
@@ -417,6 +455,7 @@ They are rough and should be re-planned after milestone 0.
 | Art cost of a full roster | Schedule | Low-poly 3D with shared rigs; 11 unit lines is a hard cap for v1. |
 | Battery and heat | Reviews | Tick-rate and frame-rate caps, no per-frame allocations in the sim, profiling gate at each milestone. |
 | AI too weak or too obviously cheating | Single-player retention | Scripted build orders plus a utility layer; only Brutal cheats and says so. |
+| Dependence on Photon Quantum (pricing, licence changes) | Multiplayer cost and schedule | Simulation is isolated behind a Command interface with no `UnityEngine` reference, so a hand-written fixed-point sim can replace Quantum; the swap is budgeted at 6 weeks if ever needed. |
 
 ---
 
@@ -424,7 +463,7 @@ They are rough and should be re-planned after milestone 0.
 
 These need an owner's call before M0 starts. Defaults are what this document assumes.
 
-1. **Engine**: Godot 4 + C# (default) or Unity.
+1. ~~Engine~~: decided, Unity 6 with Photon Quantum (section 12.1).
 2. **Art style**: low-poly 3D with fixed camera (default) or 2D pre-rendered sprites.
 3. **Monetization**: premium unlock (default) or free-to-play with cosmetics only.
 4. **Multiplayer timing**: at soft launch (default) or a later update to ship single player sooner.
