@@ -1,0 +1,173 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+
+namespace Oduncu.Sim
+{
+    public enum CommandKind : byte
+    {
+        None = 0,
+        Move = 1,
+        Gather = 2,
+        Build = 3,
+        Train = 4,
+        Attack = 5,
+        Stop = 6,
+    }
+
+    /// <summary>
+    /// The only way anything (player, AI, network) changes simulation state. Commands are
+    /// plain data so they can be logged, replayed and sent over the wire.
+    /// </summary>
+    public sealed class Command
+    {
+        private static readonly int[] NoUnits = Array.Empty<int>();
+
+        public CommandKind Kind;
+        public int Player;
+        /// <summary>Acting units, sorted ascending and de-duplicated so issue order never matters.</summary>
+        public int[] Units = NoUnits;
+        public int Target;
+        public EntityKind EntityType;
+        public Cell Cell;
+
+        public static Command Move(int player, IEnumerable<int> units, Cell to)
+            => new Command { Kind = CommandKind.Move, Player = player, Units = Normalize(units), Cell = to };
+
+        public static Command Gather(int player, IEnumerable<int> units, int resourceId)
+            => new Command { Kind = CommandKind.Gather, Player = player, Units = Normalize(units), Target = resourceId };
+
+        public static Command Build(int player, IEnumerable<int> villagers, EntityKind building, Cell origin)
+            => new Command { Kind = CommandKind.Build, Player = player, Units = Normalize(villagers), EntityType = building, Cell = origin };
+
+        public static Command Train(int player, int buildingId, EntityKind unit)
+            => new Command { Kind = CommandKind.Train, Player = player, Target = buildingId, EntityType = unit };
+
+        public static Command Attack(int player, IEnumerable<int> units, int targetId)
+            => new Command { Kind = CommandKind.Attack, Player = player, Units = Normalize(units), Target = targetId };
+
+        public static Command Stop(int player, IEnumerable<int> units)
+            => new Command { Kind = CommandKind.Stop, Player = player, Units = Normalize(units) };
+
+        private static int[] Normalize(IEnumerable<int> units)
+        {
+            if (units == null) return NoUnits;
+            var set = new SortedSet<int>(units);
+            var arr = new int[set.Count];
+            set.CopyTo(arr);
+            return arr;
+        }
+
+        public void WriteState(StateHasher h)
+        {
+            h.Write((int)Kind);
+            h.Write(Player);
+            h.Write(Units.Length);
+            for (int i = 0; i < Units.Length; i++) h.Write(Units[i]);
+            h.Write(Target);
+            h.Write((int)EntityType);
+            h.Write(Cell);
+        }
+
+        public void Write(BinaryWriter w)
+        {
+            w.Write((byte)Kind);
+            w.Write(Player);
+            w.Write(Units.Length);
+            for (int i = 0; i < Units.Length; i++) w.Write(Units[i]);
+            w.Write(Target);
+            w.Write((byte)EntityType);
+            w.Write(Cell.X);
+            w.Write(Cell.Y);
+        }
+
+        public static Command Read(BinaryReader r)
+        {
+            var c = new Command
+            {
+                Kind = (CommandKind)r.ReadByte(),
+                Player = r.ReadInt32(),
+            };
+            int n = r.ReadInt32();
+            var units = new int[n];
+            for (int i = 0; i < n; i++) units[i] = r.ReadInt32();
+            c.Units = units;
+            c.Target = r.ReadInt32();
+            c.EntityType = (EntityKind)r.ReadByte();
+            int x = r.ReadInt32();
+            int y = r.ReadInt32();
+            c.Cell = new Cell(x, y);
+            return c;
+        }
+
+        public override string ToString()
+            => Kind + " p" + Player + " units=" + Units.Length + " target=" + Target + " type=" + EntityType + " cell=" + Cell;
+    }
+
+    /// <summary>Every command of a match, by tick. Replaying a log reproduces the match exactly.</summary>
+    public sealed class CommandLog
+    {
+        public const int FormatVersion = 1;
+
+        public readonly struct Entry
+        {
+            public readonly int Tick;
+            public readonly Command Command;
+            public Entry(int tick, Command command) { Tick = tick; Command = command; }
+        }
+
+        private readonly List<Entry> _entries = new List<Entry>();
+        private readonly List<Command> _scratch = new List<Command>();
+
+        public int Seed;
+        public IReadOnlyList<Entry> Entries => _entries;
+
+        public void Record(int tick, IReadOnlyList<Command> commands)
+        {
+            for (int i = 0; i < commands.Count; i++) _entries.Add(new Entry(tick, commands[i]));
+        }
+
+        /// <summary>Commands recorded for one tick, in recorded order. The list is reused between calls.</summary>
+        public IReadOnlyList<Command> CommandsAt(int tick)
+        {
+            _scratch.Clear();
+            for (int i = 0; i < _entries.Count; i++)
+            {
+                if (_entries[i].Tick == tick) _scratch.Add(_entries[i].Command);
+            }
+            return _scratch;
+        }
+
+        public void Save(Stream stream)
+        {
+            using (var w = new BinaryWriter(stream, System.Text.Encoding.UTF8, leaveOpen: true))
+            {
+                w.Write(FormatVersion);
+                w.Write(Seed);
+                w.Write(_entries.Count);
+                for (int i = 0; i < _entries.Count; i++)
+                {
+                    w.Write(_entries[i].Tick);
+                    _entries[i].Command.Write(w);
+                }
+            }
+        }
+
+        public static CommandLog Load(Stream stream)
+        {
+            using (var r = new BinaryReader(stream, System.Text.Encoding.UTF8, leaveOpen: true))
+            {
+                int version = r.ReadInt32();
+                if (version != FormatVersion) throw new InvalidDataException("Unsupported command log version " + version);
+                var log = new CommandLog { Seed = r.ReadInt32() };
+                int n = r.ReadInt32();
+                for (int i = 0; i < n; i++)
+                {
+                    int tick = r.ReadInt32();
+                    log._entries.Add(new Entry(tick, Command.Read(r)));
+                }
+                return log;
+            }
+        }
+    }
+}

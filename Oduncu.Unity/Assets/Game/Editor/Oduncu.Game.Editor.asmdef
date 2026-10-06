@@ -1,0 +1,19 @@
+{
+    "name": "Oduncu.Game.Editor",
+    "rootNamespace": "Oduncu.Game.Editor",
+    "references": [
+        "Oduncu.Game",
+        "Oduncu.Sim"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

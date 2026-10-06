@@ -1,0 +1,46 @@
+# Unity (project lives in Oduncu.Unity/)
+Oduncu.Unity/[Ll]ibrary/
+Oduncu.Unity/[Tt]emp/
+Oduncu.Unity/[Oo]bj/
+Oduncu.Unity/[Bb]uild/
+Oduncu.Unity/[Bb]uilds/
+Oduncu.Unity/[Ll]ogs/
+Oduncu.Unity/[Uu]ser[Ss]ettings/
+Oduncu.Unity/[Mm]emoryCaptures/
+Oduncu.Unity/[Rr]ecordings/
+Oduncu.Unity/Assets/AddressableAssetsData/*/*.bin*
+Oduncu.Unity/Assets/StreamingAssets/aa/
+Oduncu.Unity/*.csproj
+Oduncu.Unity/*.sln
+Oduncu.Unity/*.pidb
+Oduncu.Unity/*.booproj
+Oduncu.Unity/*.svd
+Oduncu.Unity/*.pdb
+Oduncu.Unity/*.mdb
+Oduncu.Unity/*.opendb
+Oduncu.Unity/*.VC.db
+Oduncu.Unity/.vs/
+Oduncu.Unity/.vsconfig
+Oduncu.Unity/crashlytics-build.properties
+Oduncu.Unity/ExportedObj/
+Oduncu.Unity/.consulo/
+Oduncu.Unity/sysinfo.txt
+Oduncu.Unity/*.apk
+Oduncu.Unity/*.aab
+Oduncu.Unity/*.unitypackage
+Oduncu.Unity/*.app
+# Unity creates these on first open; keep ProjectVersion.txt and anything hand-authored.
+Oduncu.Unity/Packages/packages-lock.json
+
+# .NET headless projects
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+
+# IDEs and OS
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

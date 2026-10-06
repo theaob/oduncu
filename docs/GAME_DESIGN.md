@@ -353,13 +353,15 @@ Rules that keep the simulation portable and testable:
 
 - The simulation assembly has no reference to `UnityEngine`. It is a plain C# class
   library compiled into the Unity project and into a separate .NET test project.
-- All simulation maths uses Quantum's `FP` fixed-point type. `float` and `double` are
-  banned in the simulation assembly by an analyzer rule.
+- All simulation maths uses the `FP` fixed-point type in the simulation assembly, whose
+  API mirrors Quantum's `FP` so the two can be swapped at M3. `float` and `double` are
+  banned in the simulation assembly by code review now and by an analyzer rule from M1.
 - Presentation never mutates simulation state; it only submits Commands.
 - The AI submits Commands through the same interface as a human player.
 
-If Quantum is dropped later (cost, licensing), the same boundary allows a hand-written
-fixed-point sim to replace it without touching presentation.
+Quantum is not needed until multiplayer, so M0 to M2 run the hand-written simulation and
+M3 adopts Quantum behind the same boundary. If Quantum is later dropped (cost, licensing),
+the hand-written simulation stays in place without touching presentation.
 
 ### 12.3 Determinism and multiplayer
 
@@ -403,14 +405,17 @@ oduncu/
   docs/                     design docs, this file
   Oduncu.Unity/             Unity project
     Assets/
-      Sim/                  simulation assembly (asmdef, no UnityEngine ref)
-      Game/                 presentation: scenes, prefabs, input, UI Toolkit
-      Data/                 ScriptableObjects and CSV sources for units, techs, civs
-      Art/                  models, animations, materials, audio
+      Sim/                  simulation assembly (asmdef with noEngineReferences)
+      Sim.Tests/            NUnit tests, run by Unity's Test Runner and headless
+      Game/                 presentation: scripts, editor bootstrap, build script, scenes
+      Data/                 (M1) ScriptableObjects and CSV sources for units, techs, civs
+      Art/                  (M1) models, animations, materials, audio
     Packages/
     ProjectSettings/
-  Oduncu.Sim.Tests/         headless .NET test project referencing Assets/Sim sources
-  tools/                    map generator CLI, balance spreadsheet exporter
+  Oduncu.Sim/               .NET library project compiling Assets/Sim sources headless
+  Oduncu.Sim.Tests/         .NET test project compiling Assets/Sim.Tests sources headless
+  tools/                    (M1) map generator CLI, balance spreadsheet exporter
+  .github/workflows/        CI: headless tests on every push, Android build when licensed
 ```
 
 Unity version is pinned in `ProjectSettings/ProjectVersion.txt`; the repo uses Git LFS
@@ -437,10 +442,10 @@ They are rough and should be re-planned after milestone 0.
 
 | Milestone | Target | Exit criteria |
 |---|---|---|
-| M0 Prototype | Week 8 | Unity project set up with Quantum, Git LFS and CI build for Android. Headless sim with villagers, one resource, one building, one unit, A* pathing, combat. Tap-to-move on a phone. Determinism test passes 10,000 ticks on two devices with identical hashes. |
+| M0 Prototype | Week 8 | Unity project set up with Git LFS and CI build for Android. Headless sim with villagers, one resource, one building, one unit, A* pathing, combat. Tap-to-move on a phone. Determinism test passes 10,000 ticks on two devices with identical hashes. **Scaffolded: sim, tests, Unity shell and CI are in the repository; the on-device hash check is the remaining exit item.** |
 | M1 Vertical slice | Week 20 | All four ages, full unit roster for one civ, one map template, Standard AI, complete touch UI. Internal playtests reach a 15-minute match. |
 | M2 Content | Week 30 | Four civs, three map templates, 12 campaign missions, Easy to Brutal AI, save and load, tutorial, audio. |
-| M3 Multiplayer | Week 42 | Relay server, 1v1 and 2v2, reconnect, replays, desync telemetry. Closed beta of 200 players. |
+| M3 Multiplayer | Week 42 | Photon Quantum adopted behind the simulation boundary. Relay, 1v1 and 2v2, reconnect, replays, desync telemetry. Closed beta of 200 players. |
 | M4 Soft launch | Week 50 | Store listings, analytics, crash reporting, localisation (English, Turkish, plus 3). Release in two test countries. |
 
 ---
