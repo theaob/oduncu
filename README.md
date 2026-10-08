@@ -5,6 +5,7 @@ redesigned for touch and 15-minute matches. Built with Unity 6 and C#.
 
 - Design document: [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md)
 - Current milestone: **M0 prototype** (see section 14 of the design document)
+- Next milestone plan: [docs/MILESTONE_1_PLAN.md](docs/MILESTONE_1_PLAN.md)
 
 ## Layout
 
