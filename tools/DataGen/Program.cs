@@ -138,6 +138,7 @@ namespace Oduncu.Tools.DataGen
         {
             "MaxHp", "Attack", "MeleeArmor", "PierceArmor", "Range", "Reload", "Speed", "LineOfSight",
             "TrainTime", "BuildTime", "CostFood", "CostWood", "CostGold", "CostStone", "GatherRate",
+            "CarryCapacity", "Splash",
         };
 
         private static readonly string[] Resources = { "Food", "Wood", "Gold", "Stone" };
@@ -205,8 +206,16 @@ namespace Oduncu.Tools.DataGen
 
             var techById = new SortedDictionary<int, Table.Row>();
             var techKeys = new HashSet<string>();
+            var civs = new List<string>();
             foreach (var r in techs.Rows)
             {
+                string civ = r["Civ"];
+                if (civ.Length != 0)
+                {
+                    RequireIdentifier(r, civ);
+                    if (civ == "None") throw r.Error("None is reserved");
+                    if (!civs.Contains(civ)) civs.Add(civ);
+                }
                 int id = Int(r, "Id");
                 string key = r["Key"];
                 RequireIdentifier(r, key);
@@ -239,6 +248,10 @@ namespace Oduncu.Tools.DataGen
 
             sb.Append("    public enum TechId : byte\n    {\n        None = 0,\n");
             foreach (var kv in techById) sb.Append("        ").Append(kv.Value["Key"]).Append(" = ").Append(kv.Key).Append(",\n");
+            sb.Append("    }\n\n");
+
+            sb.Append("    public enum CivId : byte\n    {\n        None = 0,\n");
+            for (int i = 0; i < civs.Count; i++) sb.Append("        ").Append(civs[i]).Append(" = ").Append(i + 1).Append(",\n");
             sb.Append("    }\n\n");
 
             sb.Append("    public static partial class GameData\n    {\n");
@@ -397,8 +410,13 @@ namespace Oduncu.Tools.DataGen
 
         private static void AppendTech(StringBuilder sb, Table.Row r, Dictionary<string, Entity> byKey, HashSet<string> techKeys, HashSet<string> ageKeys)
         {
+            // A row with a Civ and no ResearchedAt is a civilization bonus, granted on reaching MinAge.
+            string civ = r["Civ"];
             string at = r["ResearchedAt"];
-            if (!byKey.TryGetValue(at, out Entity building) || building.Row["Category"] != "building")
+            bool bonus = at.Length == 0;
+            if (bonus && civ.Length == 0) throw r.Error("ResearchedAt is required unless the row is a civilization bonus");
+            if (bonus) at = "None";
+            else if (!byKey.TryGetValue(at, out Entity building) || building.Row["Category"] != "building")
                 throw r.Error("ResearchedAt must be a building, got " + at);
             string age = r["MinAge"];
             if (!ageKeys.Contains(age)) throw r.Error("unknown age " + age);
@@ -406,7 +424,7 @@ namespace Oduncu.Tools.DataGen
             if (requires.Length != 0 && !techKeys.Contains(requires)) throw r.Error("Requires unknown tech " + requires);
             if (requires == r["Key"]) throw r.Error("a tech cannot require itself");
             int ticks = Seconds(r, "ResearchSeconds");
-            if (ticks <= 0) throw r.Error("ResearchSeconds must be positive");
+            if (!bonus && ticks <= 0) throw r.Error("ResearchSeconds must be positive");
 
             sb.Append("            t[").Append(Int(r, "Id")).Append("] = new TechDef\n            {\n");
             sb.Append("                Id = TechId.").Append(r["Key"]).Append(", Key = \"").Append(r["Key"])
@@ -416,7 +434,8 @@ namespace Oduncu.Tools.DataGen
               .Append(", Cost = new Cost(").Append(Int(r, "Food")).Append(", ").Append(Int(r, "Wood")).Append(", ")
               .Append(Int(r, "Gold")).Append(", ").Append(Int(r, "Stone")).Append("),\n");
             sb.Append("                ResearchTicks = ").Append(ticks).Append(", Requires = TechId.")
-              .Append(requires.Length == 0 ? "None" : requires).Append(",\n            };\n");
+              .Append(requires.Length == 0 ? "None" : requires).Append(", Civ = CivId.")
+              .Append(civ.Length == 0 ? "None" : civ).Append(",\n            };\n");
         }
 
         private static void AppendEffect(StringBuilder sb, Table.Row r, Dictionary<string, Entity> byKey, Dictionary<string, string> tagByKey, HashSet<string> techKeys)

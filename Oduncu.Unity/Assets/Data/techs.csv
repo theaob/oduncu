@@ -1,5 +1,38 @@
-# Researchable technologies. Ids are stored in command logs; never renumber or reuse.
-Id,Key,Name,ResearchedAt,MinAge,Food,Wood,Gold,Stone,ResearchSeconds,Requires,Description
-1,MeleeAttack1,Melee Attack I,Forge,Feudal,150,0,0,0,50,,+1 attack for infantry and cavalry
-2,MeleeAttack2,Melee Attack II,Forge,Castle,220,0,120,0,65,MeleeAttack1,+1 attack for infantry and cavalry
-3,MeleeAttack3,Melee Attack III,Forge,Imperial,275,0,225,0,75,MeleeAttack2,+2 attack for infantry and cavalry
+# Researchable technologies and civilization bonuses. Ids are stored in command logs; never renumber or reuse.
+# A row with a Civ and a ResearchedAt is a unique tech only that civilization can research. A row with a Civ
+# and no ResearchedAt is a civilization bonus: it is granted for free when the player reaches MinAge.
+Id,Key,Name,ResearchedAt,MinAge,Food,Wood,Gold,Stone,ResearchSeconds,Requires,Civ,Description
+1,MeleeAttack1,Melee Attack I,Forge,Feudal,150,0,0,0,50,,,+1 attack for infantry and cavalry
+2,MeleeAttack2,Melee Attack II,Forge,Castle,220,0,120,0,65,MeleeAttack1,,+1 attack for infantry and cavalry
+3,MeleeAttack3,Melee Attack III,Forge,Imperial,275,0,225,0,75,MeleeAttack2,,+2 attack for infantry and cavalry
+4,ArcherAttack1,Archer Attack I,Forge,Feudal,100,0,50,0,30,,,+1 attack for archers and shooting buildings
+5,ArcherAttack2,Archer Attack II,Forge,Castle,200,0,100,0,50,ArcherAttack1,,+1 attack for archers and shooting buildings
+6,ArcherAttack3,Archer Attack III,Forge,Imperial,300,0,200,0,60,ArcherAttack2,,+1 attack for archers and shooting buildings
+7,InfantryArmor1,Infantry Armour I,Forge,Feudal,100,0,0,0,40,,,+1 melee and pierce armour for infantry
+8,InfantryArmor2,Infantry Armour II,Forge,Castle,200,0,100,0,50,InfantryArmor1,,+1 melee and pierce armour for infantry
+9,InfantryArmor3,Infantry Armour III,Forge,Imperial,300,0,150,0,60,InfantryArmor2,,+1 melee and pierce armour for infantry
+10,CavalryArmor1,Cavalry Armour I,Forge,Feudal,150,0,0,0,40,,,+1 melee and pierce armour for cavalry
+11,CavalryArmor2,Cavalry Armour II,Forge,Castle,250,0,150,0,55,CavalryArmor1,,+1 melee and pierce armour for cavalry
+12,CavalryArmor3,Cavalry Armour III,Forge,Imperial,350,0,200,0,65,CavalryArmor2,,+1 melee and pierce armour for cavalry
+13,ArcherArmor1,Archer Armour I,Forge,Feudal,100,0,0,0,40,,,+1 melee and pierce armour for archers
+14,ArcherArmor2,Archer Armour II,Forge,Castle,150,0,150,0,50,ArcherArmor1,,+1 melee and pierce armour for archers
+15,ArcherArmor3,Archer Armour III,Forge,Imperial,250,0,250,0,60,ArcherArmor2,,+1 melee and pierce armour for archers
+16,Woodcutting1,Double-Bit Axe,LumberCamp,Dark,100,50,0,0,25,,,Villagers chop wood 20% faster
+17,Woodcutting2,Bow Saw,LumberCamp,Feudal,150,100,0,0,50,Woodcutting1,,Villagers chop wood another 20% faster
+18,Farming1,Horse Collar,Mill,Dark,75,75,0,0,20,,,Farms yield food 15% faster
+19,Farming2,Heavy Plow,Mill,Feudal,125,125,0,0,40,Farming1,,Farms and berries yield food another 15% faster
+20,GoldMining1,Gold Mining,MiningCamp,Dark,100,75,0,0,30,,,Villagers mine gold 15% faster
+21,GoldMining2,Gold Shaft Mining,MiningCamp,Castle,200,150,0,0,60,GoldMining1,,Villagers mine gold another 15% faster
+22,StoneMining1,Stone Mining,MiningCamp,Dark,100,75,0,0,30,,,Villagers mine stone 15% faster
+23,StoneMining2,Stone Shaft Mining,MiningCamp,Castle,200,150,0,0,60,StoneMining1,,Villagers mine stone another 15% faster
+24,Loom,Loom,TownCenter,Dark,0,0,50,0,25,,,Villagers get +15 hit points and +1 melee and pierce armour
+25,Wheelbarrow,Wheelbarrow,TownCenter,Feudal,175,50,0,0,75,,,Villagers move 10% faster and carry 3 more
+26,HandCart,Hand Cart,TownCenter,Castle,300,200,0,0,55,Wheelbarrow,,Villagers move 10% faster and carry 5 more
+27,TownWatch,Town Watch,TownCenter,Feudal,75,0,0,0,25,,,+4 line of sight for all buildings
+28,Yeomen,Yeomen,Castle,Castle,450,0,300,0,60,,Woodlanders,+1 range for archers and longbowmen
+29,Warwolf,Warwolf,Castle,Imperial,0,800,400,0,60,,Woodlanders,Trebuchet shots splash 1 tile
+30,Sanctity,Sanctity,Monastery,Castle,0,0,120,0,60,,,+15 hit points for monks
+31,Fervor,Fervor,Monastery,Castle,0,0,140,0,50,,,Monks move 15% faster
+32,WoodlandersCamps,Woodland Camps,,Dark,0,0,0,0,0,,Woodlanders,Lumber camps cost 50% less wood
+33,WoodlandersForestry,Forestry,,Dark,0,0,0,0,0,,Woodlanders,Wood is gathered 15% faster
+34,WoodlandersMarksmen,Marksmen,,Castle,0,0,0,0,0,,Woodlanders,Archers and longbowmen get +1 range in the Castle Age

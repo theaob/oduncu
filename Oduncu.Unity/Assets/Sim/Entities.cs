@@ -21,12 +21,28 @@ namespace Oduncu.Sim
         Healing = 10,
     }
 
-    /// <summary>One slot of a production queue: what is being made and what was paid for it.</summary>
+    /// <summary>One slot of a production queue: a unit, a tech or an age, and what was paid for it.</summary>
     public struct QueueItem
     {
+        /// <summary>The unit being trained, or None for research.</summary>
         public EntityKind Unit;
+        /// <summary>The tech being researched, or None.</summary>
+        public TechId Tech;
+        /// <summary>The age being researched (Dark means none: nobody researches the Dark Age).</summary>
+        public AgeId Age;
         /// <summary>The exact price charged when queued, refunded in full on cancel.</summary>
         public Cost Paid;
+
+        public bool IsResearch => Unit == EntityKind.None;
+        public bool IsAgeUp => Age != AgeId.Dark;
+
+        public void WriteState(StateHasher h)
+        {
+            h.Write((int)Unit);
+            h.Write((int)Tech);
+            h.Write((int)Age);
+            Paid.WriteState(h);
+        }
     }
 
     /// <summary>
@@ -212,11 +228,7 @@ namespace Oduncu.Sim
             h.Write(FarmerId);
             h.Write(Amount);
             h.Write(TrainQueue.Count);
-            for (int i = 0; i < TrainQueue.Count; i++)
-            {
-                h.Write((int)TrainQueue[i].Unit);
-                TrainQueue[i].Paid.WriteState(h);
-            }
+            for (int i = 0; i < TrainQueue.Count; i++) TrainQueue[i].WriteState(h);
             h.Write(HasPath);
             if (HasPath)
             {
@@ -236,6 +248,8 @@ namespace Oduncu.Sim
         public int Gold;
         public int Stone;
         public bool Alive = true;
+        public AgeId Age = AgeId.Dark;
+        public CivId Civ = CivId.None;
         /// <summary>Units alive plus units in production, recounted every tick.</summary>
         public int Population;
         /// <summary>Housing from finished buildings, capped at SimConstants.MaxPopulation.</summary>
@@ -313,6 +327,8 @@ namespace Oduncu.Sim
             h.Write(Gold);
             h.Write(Stone);
             h.Write(Alive);
+            h.Write((int)Age);
+            h.Write((int)Civ);
             h.Write(Population);
             h.Write(PopulationCap);
             h.Write(HadConquestBuilding);

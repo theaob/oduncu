@@ -115,6 +115,7 @@ namespace Oduncu.Sim
         {
             int size = BenchmarkMapSize;
             var sim = new Simulation(size, size, 2, (ulong)seed);
+            for (int p = 0; p < sim.Players.Length; p++) sim.SetCivilization(p, CivId.Woodlanders);
             var rng = new DeterministicRandom((ulong)seed * 104729UL + 3UL);
             sim.SpawnStructure(EntityKind.TownCenter, 0, new Cell(4, 4), false);
             sim.SpawnStructure(EntityKind.TownCenter, 1, new Cell(size - 7, size - 7), false);

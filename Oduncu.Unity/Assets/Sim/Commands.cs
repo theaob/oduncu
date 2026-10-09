@@ -21,6 +21,10 @@ namespace Oduncu.Sim
         Garrison = 12,
         Ungarrison = 13,
         SetStance = 14,
+        Research = 15,
+        AgeUp = 16,
+        MarketBuy = 17,
+        MarketSell = 18,
     }
 
     public enum Stance : byte
@@ -47,7 +51,7 @@ namespace Oduncu.Sim
         public Cell Cell;
         /// <summary>Second cell for commands that span two points (walls, from milestone 1).</summary>
         public Cell Cell2;
-        /// <summary>Small integer argument: queue slot for CancelTrain, 0/1 for SetAutoQueue, packed shares for SetEconomyTargets, the Stance for SetStance.</summary>
+        /// <summary>Small integer argument: queue slot for CancelTrain, 0/1 for SetAutoQueue, packed shares for SetEconomyTargets, the Stance for SetStance, the TechId for Research, the ResourceKind for market trades.</summary>
         public int Arg;
 
         public static Command Move(int player, IEnumerable<int> units, Cell to)
@@ -94,6 +98,21 @@ namespace Oduncu.Sim
 
         public static Command SetStance(int player, IEnumerable<int> units, Stance stance)
             => new Command { Kind = CommandKind.SetStance, Player = player, Units = Normalize(units), Arg = (int)stance };
+
+        public static Command Research(int player, int buildingId, TechId tech)
+            => new Command { Kind = CommandKind.Research, Player = player, Target = buildingId, Arg = (int)tech };
+
+        /// <summary>Research the next age at a Town Center.</summary>
+        public static Command AgeUp(int player, int townCenterId)
+            => new Command { Kind = CommandKind.AgeUp, Player = player, Target = townCenterId };
+
+        /// <summary>Buy 100 food, wood or stone for gold at a market.</summary>
+        public static Command MarketBuy(int player, int marketId, ResourceKind kind)
+            => new Command { Kind = CommandKind.MarketBuy, Player = player, Target = marketId, Arg = (int)kind };
+
+        /// <summary>Sell 100 food, wood or stone for gold at a market.</summary>
+        public static Command MarketSell(int player, int marketId, ResourceKind kind)
+            => new Command { Kind = CommandKind.MarketSell, Player = player, Target = marketId, Arg = (int)kind };
 
         private static int[] Normalize(IEnumerable<int> units)
         {
@@ -166,9 +185,9 @@ namespace Oduncu.Sim
         /// Bumped whenever command kinds or fields change; older logs are rejected rather than
         /// misread. Version 2 added CancelTrain and the Cell2 and Arg fields; version 3 adds
         /// SetRally, Repair, SetAutoQueue and SetEconomyTargets; version 4 adds Garrison,
-        /// Ungarrison and SetStance.
+        /// Ungarrison and SetStance; version 5 adds Research, AgeUp, MarketBuy and MarketSell.
         /// </summary>
-        public const int FormatVersion = 4;
+        public const int FormatVersion = 5;
 
         public readonly struct Entry
         {

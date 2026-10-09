@@ -56,6 +56,13 @@ namespace Oduncu.Sim
 
         public static readonly Cost Zero = new Cost(0, 0, 0, 0);
 
+        /// <summary>A price in a single resource.</summary>
+        public static Cost Of(ResourceKind kind, int amount)
+        {
+            return new Cost(kind == ResourceKind.Food ? amount : 0, kind == ResourceKind.Wood ? amount : 0,
+                kind == ResourceKind.Gold ? amount : 0, kind == ResourceKind.Stone ? amount : 0);
+        }
+
         public int this[ResourceKind kind]
         {
             get
@@ -174,6 +181,11 @@ namespace Oduncu.Sim
         public Cost Cost;
         public int ResearchTicks;
         public TechId Requires;
+        /// <summary>None for shared techs; otherwise only this civilization gets it.</summary>
+        public CivId Civ;
+
+        /// <summary>A civilization bonus: never researched, granted on reaching MinAge.</summary>
+        public bool IsCivBonus => ResearchedAt == EntityKind.None;
     }
 
     public enum StatId : byte
@@ -193,6 +205,8 @@ namespace Oduncu.Sim
         CostGold,
         CostStone,
         GatherRate,
+        CarryCapacity,
+        Splash,
     }
 
     public enum EffectOp : byte

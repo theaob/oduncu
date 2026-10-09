@@ -1,5 +1,6 @@
 # What each tech changes. Target is an entity key, tag:<tag key>, or all.
-# Op is add or mul. Values use the stat's CSV unit (seconds for times, tiles per second for Speed).
+# Op is add or mul. Values use the stat's CSV unit (seconds for times, tiles per second for Speed and
+# GatherRate, tiles for Range and Splash).
 Tech,Target,Stat,Op,Value
 MeleeAttack1,tag:infantry,Attack,add,1
 MeleeAttack1,tag:cavalry,Attack,add,1
@@ -7,3 +8,59 @@ MeleeAttack2,tag:infantry,Attack,add,1
 MeleeAttack2,tag:cavalry,Attack,add,1
 MeleeAttack3,tag:infantry,Attack,add,2
 MeleeAttack3,tag:cavalry,Attack,add,2
+ArcherAttack1,tag:archer,Attack,add,1
+ArcherAttack1,tag:shoots,Attack,add,1
+ArcherAttack2,tag:archer,Attack,add,1
+ArcherAttack2,tag:shoots,Attack,add,1
+ArcherAttack3,tag:archer,Attack,add,1
+ArcherAttack3,tag:shoots,Attack,add,1
+InfantryArmor1,tag:infantry,MeleeArmor,add,1
+InfantryArmor1,tag:infantry,PierceArmor,add,1
+InfantryArmor2,tag:infantry,MeleeArmor,add,1
+InfantryArmor2,tag:infantry,PierceArmor,add,1
+InfantryArmor3,tag:infantry,MeleeArmor,add,1
+InfantryArmor3,tag:infantry,PierceArmor,add,1
+CavalryArmor1,tag:cavalry,MeleeArmor,add,1
+CavalryArmor1,tag:cavalry,PierceArmor,add,1
+CavalryArmor2,tag:cavalry,MeleeArmor,add,1
+CavalryArmor2,tag:cavalry,PierceArmor,add,1
+CavalryArmor3,tag:cavalry,MeleeArmor,add,1
+CavalryArmor3,tag:cavalry,PierceArmor,add,1
+ArcherArmor1,tag:archer,MeleeArmor,add,1
+ArcherArmor1,tag:archer,PierceArmor,add,1
+ArcherArmor2,tag:archer,MeleeArmor,add,1
+ArcherArmor2,tag:archer,PierceArmor,add,1
+ArcherArmor3,tag:archer,MeleeArmor,add,1
+ArcherArmor3,tag:archer,PierceArmor,add,1
+Woodcutting1,Tree,GatherRate,mul,1.2
+Woodcutting2,Tree,GatherRate,mul,1.2
+Farming1,Farm,GatherRate,mul,1.15
+Farming2,Farm,GatherRate,mul,1.15
+Farming2,Berries,GatherRate,mul,1.15
+GoldMining1,GoldMine,GatherRate,mul,1.15
+GoldMining2,GoldMine,GatherRate,mul,1.15
+StoneMining1,StoneMine,GatherRate,mul,1.15
+StoneMining2,StoneMine,GatherRate,mul,1.15
+Loom,Villager,MaxHp,add,15
+Loom,Villager,MeleeArmor,add,1
+Loom,Villager,PierceArmor,add,1
+Wheelbarrow,Villager,Speed,mul,1.1
+Wheelbarrow,Villager,CarryCapacity,add,3
+HandCart,Villager,Speed,mul,1.1
+HandCart,Villager,CarryCapacity,add,5
+TownWatch,tag:building,LineOfSight,add,4
+Yeomen,Archer,Range,add,1
+Yeomen,Crossbowman,Range,add,1
+Yeomen,Arbalester,Range,add,1
+Yeomen,Longbowman,Range,add,1
+Yeomen,EliteLongbowman,Range,add,1
+Warwolf,Trebuchet,Splash,add,1
+Sanctity,Monk,MaxHp,add,15
+Fervor,Monk,Speed,mul,1.15
+WoodlandersCamps,LumberCamp,CostWood,mul,0.5
+WoodlandersForestry,Tree,GatherRate,mul,1.15
+WoodlandersMarksmen,Archer,Range,add,1
+WoodlandersMarksmen,Crossbowman,Range,add,1
+WoodlandersMarksmen,Arbalester,Range,add,1
+WoodlandersMarksmen,Longbowman,Range,add,1
+WoodlandersMarksmen,EliteLongbowman,Range,add,1
