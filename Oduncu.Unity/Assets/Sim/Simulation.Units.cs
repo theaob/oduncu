@@ -50,6 +50,18 @@ namespace Oduncu.Sim
 
         private void UpdateMoving(Entity u)
         {
+            if (u.AttackMove && (CurrentTick + u.Id) % SimConstants.AutoEngageInterval == 0)
+            {
+                Entity target = FindAttackTarget(u, FP.FromInt(u.Stats.LineOfSight));
+                if (target != null)
+                {
+                    u.State = UnitState.Attacking;
+                    u.TargetId = target.Id;
+                    u.AutoTarget = true;
+                    u.HasPath = false;
+                    return;
+                }
+            }
             FP speed = u.SpeedCap > FP.Zero ? FP.Min(u.Stats.Speed, u.SpeedCap) : u.Stats.Speed;
             if (u.UsesFlow)
             {
@@ -127,8 +139,20 @@ namespace Oduncu.Sim
             return _pathfinder.FindPathAdjacentToRect(u.Cell, target.Footprint, u.Path, u.Owner);
         }
 
+        /// <summary>An attack-moving unit whose fight is over walks on; anything else goes idle.</summary>
+        private void FinishFight(Entity u)
+        {
+            if (!u.AttackMove) { SetIdle(u); return; }
+            u.State = UnitState.Moving;
+            u.TargetId = 0;
+            u.AutoTarget = false;
+            u.HasPath = false;
+            u.UsesFlow = false;
+        }
+
         private void SetIdle(Entity u)
         {
+            u.AttackMove = false;
             u.State = UnitState.Idle;
             u.HasPath = false;
             u.TargetId = 0;
@@ -140,6 +164,7 @@ namespace Oduncu.Sim
 
         private void MoveTo(Entity u, Cell cell)
         {
+            u.AttackMove = false;
             u.State = UnitState.Moving;
             u.MoveTarget = Map.Clamp(cell);
             u.HasPath = false;

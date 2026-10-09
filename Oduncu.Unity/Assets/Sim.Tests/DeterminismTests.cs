@@ -35,7 +35,7 @@ namespace Oduncu.Sim.Tests
             Assert.AreEqual(log.Entries.Count, loaded.Entries.Count);
 
             var replayed = new List<ulong>();
-            ulong replayHash = Scenarios.Replay(MapGenerator.CreateDefault(loaded.Seed), loaded, Scenarios.DeterminismTicks, replayed);
+            ulong replayHash = Scenarios.Replay(OpenMap.Create(loaded.Seed), loaded, Scenarios.DeterminismTicks, replayed);
             for (int i = 0; i < live.Count; i++) Assert.AreEqual(live[i], replayed[i], "replay diverged at checkpoint " + i);
             Assert.AreEqual(liveHash, replayHash);
         }
@@ -73,8 +73,10 @@ namespace Oduncu.Sim.Tests
         [Test]
         public void ScenarioActuallyPlaysOut()
         {
+            // Ten minutes in: both AIs have an economy and an army, and nobody has lost yet.
             var sim = Scenarios.CreateDeterminismScenario();
-            Scenarios.RunScripted(sim, Scenarios.DeterminismTicks);
+            Scenarios.RunScripted(sim, 6000);
+            Assert.IsFalse(sim.MatchOver, "the match should still be on at ten minutes");
             Assert.IsNotNull(Scenarios.FindOwned(sim, 0, EntityKind.Barracks), "player 0 should have built a barracks");
             Assert.IsNotNull(Scenarios.FindOwned(sim, 1, EntityKind.Barracks), "player 1 should have built a barracks");
             Assert.Greater(sim.CountUnits(0), 3, "player 0 should have trained units");

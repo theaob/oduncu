@@ -18,6 +18,9 @@ namespace Oduncu.Sim
         public const int BerryBushes = 6;
         public const int GoldPile = 5;
         public const int StonePile = 4;
+        /// <summary>A second, contested gold pile further out on each side: the home pile alone runs dry by Imperial.</summary>
+        public const int OuterGoldPile = 4;
+        public const int OuterGoldMin = 16, OuterGoldMax = 22;
 
         /// <summary>Standard start distances from the Town Center footprint, in tiles (section 9).</summary>
         public const int ForestWithin = 10;
@@ -109,6 +112,7 @@ namespace Oduncu.Sim
             PlaceBlock(plan, rng, tc, Berry, 2, 3, 4, 7);
             PlaceBlock(plan, rng, tc, Gold, 0, 0, 8, 12, GoldPile);
             PlaceBlock(plan, rng, tc, Stone, 0, 0, 8, 12, StonePile);
+            PlaceBlock(plan, rng, tc, Gold, 0, 0, OuterGoldMin, OuterGoldMax, OuterGoldPile);
             PlaceForest(plan, rng, tc);
 
             // Sheep near home, boar further out; on free cells away from the base ring.

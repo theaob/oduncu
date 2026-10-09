@@ -7,13 +7,19 @@ namespace Oduncu.Sim
         /// <summary>Last rejected command reason, for debugging and UI feedback. Not part of the hashed state.</summary>
         public string LastRejection { get; private set; }
 
+        /// <summary>Raised for every rejected command, with the reason. For tests, the AI and UI feedback.</summary>
+        public event System.Action<Command, string> CommandRejected;
+
+        private Command _applying;
+
         private void ApplyCommand(Command c)
         {
             if (c == null) return;
+            _applying = c;
             if (c.Player < 0 || c.Player >= Players.Length) { Reject("bad player"); return; }
             switch (c.Kind)
             {
-                case CommandKind.Move: ApplyMove(c); break;
+                case CommandKind.Move: ApplyMove(c, attackMove: false); break;
                 case CommandKind.Gather: ApplyGather(c); break;
                 case CommandKind.Build: ApplyBuild(c); break;
                 case CommandKind.Train: ApplyTrain(c); break;
@@ -32,11 +38,16 @@ namespace Oduncu.Sim
                 case CommandKind.MarketBuy: ApplyMarketBuy(c); break;
                 case CommandKind.MarketSell: ApplyMarketSell(c); break;
                 case CommandKind.BuildWall: ApplyBuildWall(c); break;
+                case CommandKind.AttackMove: ApplyMove(c, attackMove: true); break;
                 default: Reject("unknown command"); break;
             }
         }
 
-        private void Reject(string reason) => LastRejection = reason;
+        private void Reject(string reason)
+        {
+            LastRejection = reason;
+            CommandRejected?.Invoke(_applying, reason);
+        }
 
         private Entity OwnedUnit(Command c, int id)
         {
@@ -45,7 +56,7 @@ namespace Oduncu.Sim
             return e;
         }
 
-        private void ApplyMove(Command c)
+        private void ApplyMove(Command c, bool attackMove)
         {
             if (!Map.InBounds(c.Cell)) { Reject("move target out of bounds"); return; }
             List<Entity> group = _scratchUnits;
@@ -56,6 +67,7 @@ namespace Oduncu.Sim
                 if (u != null) group.Add(u);
             }
             OrderGroupMove(group, c.Cell);
+            if (attackMove) for (int i = 0; i < group.Count; i++) group[i].AttackMove = group[i].Def.IsMilitary;
             group.Clear();
         }
 

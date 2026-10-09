@@ -1205,18 +1205,18 @@ namespace Oduncu.Sim
         {
             return new[]
             {
-                new EconomyPreset("Boom", "Boom", AgeId.Dark, new EconomyTargets(55, 45, 0, 0)),
-                new EconomyPreset("Boom", "Boom", AgeId.Feudal, new EconomyTargets(45, 40, 10, 5)),
-                new EconomyPreset("Boom", "Boom", AgeId.Castle, new EconomyTargets(40, 30, 25, 5)),
-                new EconomyPreset("Boom", "Boom", AgeId.Imperial, new EconomyTargets(35, 30, 30, 5)),
-                new EconomyPreset("Rush", "Rush", AgeId.Dark, new EconomyTargets(50, 40, 10, 0)),
-                new EconomyPreset("Rush", "Rush", AgeId.Feudal, new EconomyTargets(40, 30, 30, 0)),
+                new EconomyPreset("Boom", "Boom", AgeId.Dark, new EconomyTargets(60, 40, 0, 0)),
+                new EconomyPreset("Boom", "Boom", AgeId.Feudal, new EconomyTargets(55, 30, 15, 0)),
+                new EconomyPreset("Boom", "Boom", AgeId.Castle, new EconomyTargets(45, 25, 30, 0)),
+                new EconomyPreset("Boom", "Boom", AgeId.Imperial, new EconomyTargets(40, 25, 35, 0)),
+                new EconomyPreset("Rush", "Rush", AgeId.Dark, new EconomyTargets(55, 40, 5, 0)),
+                new EconomyPreset("Rush", "Rush", AgeId.Feudal, new EconomyTargets(45, 25, 30, 0)),
                 new EconomyPreset("Rush", "Rush", AgeId.Castle, new EconomyTargets(35, 25, 40, 0)),
                 new EconomyPreset("Rush", "Rush", AgeId.Imperial, new EconomyTargets(35, 25, 40, 0)),
-                new EconomyPreset("Siege", "Siege", AgeId.Dark, new EconomyTargets(50, 45, 0, 5)),
-                new EconomyPreset("Siege", "Siege", AgeId.Feudal, new EconomyTargets(40, 35, 15, 10)),
-                new EconomyPreset("Siege", "Siege", AgeId.Castle, new EconomyTargets(35, 25, 30, 10)),
-                new EconomyPreset("Siege", "Siege", AgeId.Imperial, new EconomyTargets(30, 25, 35, 10)),
+                new EconomyPreset("Siege", "Siege", AgeId.Dark, new EconomyTargets(55, 45, 0, 0)),
+                new EconomyPreset("Siege", "Siege", AgeId.Feudal, new EconomyTargets(50, 30, 20, 0)),
+                new EconomyPreset("Siege", "Siege", AgeId.Castle, new EconomyTargets(40, 25, 35, 0)),
+                new EconomyPreset("Siege", "Siege", AgeId.Imperial, new EconomyTargets(35, 25, 40, 0)),
             };
         }
     }
