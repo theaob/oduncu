@@ -29,6 +29,8 @@ namespace Oduncu.Sim
         public bool CanGather(Entity e, int player, bool forPlanner = false, Entity asker = null)
         {
             if (e == null || !e.Alive || !e.Def.IsGatherable) return false;
+            // The planner only sends villagers to what the player has seen.
+            if (forPlanner && !CanSee(player, e)) return false;
             if (e.IsResource) return e.Amount > 0;
             if (e.IsBuilding)
             {
@@ -215,6 +217,12 @@ namespace Oduncu.Sim
             {
                 site.UnderConstruction = false;
                 site.Hp = max;
+                // Builders walk down a wall line segment by segment.
+                if (site.Def.HasTag(EntityTag.Wall))
+                {
+                    Entity next = NextWallSite(u);
+                    if (next != null) { u.BuildSiteId = next.Id; u.HasPath = false; return; }
+                }
                 // Whoever finishes a farm starts working it.
                 if (site.Def.IsGatherable && u.Def.CanGather) StartGathering(u, site);
             }

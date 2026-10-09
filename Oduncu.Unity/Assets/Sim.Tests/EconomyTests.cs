@@ -29,7 +29,8 @@ namespace Oduncu.Sim.Tests
 
         private static Simulation Map(out Entity tc)
         {
-            var sim = new Simulation(32, 32, 2, 1);
+            // Fog is not what these tests are about; FogTests covers it.
+            var sim = new Simulation(32, 32, 2, 1) { Reveal = RevealMode.AllVisible };
             tc = sim.SpawnStructure(EntityKind.TownCenter, 0, new Cell(2, 2), false);
             return sim;
         }
@@ -329,7 +330,7 @@ namespace Oduncu.Sim.Tests
         /// <summary>A Town Center with plenty of every resource around it and some idle villagers.</summary>
         private static Simulation PlannerMap(int seed, int villagers, out List<Entity> vs)
         {
-            var sim = new Simulation(40, 40, 2, (ulong)seed);
+            var sim = new Simulation(40, 40, 2, (ulong)seed) { Reveal = RevealMode.AllVisible };
             var rng = new DeterministicRandom((ulong)seed);
             sim.SpawnStructure(EntityKind.TownCenter, 0, new Cell(18, 18), false);
             for (int i = 0; i < 12; i++) sim.SpawnStructure(EntityKind.House, 0, new Cell(1 + i * 3, 37), false);

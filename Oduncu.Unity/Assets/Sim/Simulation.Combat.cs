@@ -317,7 +317,7 @@ namespace Oduncu.Sim
             FP dist = delta.Magnitude;
             if (dist == FP.Zero) return;
             FPVector2 to = dist <= u.Stats.Speed ? point : u.Position + delta.Normalized * u.Stats.Speed;
-            if (!Map.IsFree(to.ToCell())) return;
+            if (!Map.IsPassable(to.ToCell(), u.Owner)) return;
             u.Position = to;
             SetUnitCell(u, to.ToCell());
         }

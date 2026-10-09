@@ -54,6 +54,9 @@ namespace Oduncu.Sim
         Castle = 45,
         Tower = 46,
         Market = 47,
+        PalisadeWall = 48,
+        StoneWall = 49,
+        Gate = 50,
     }
 
     [System.Flags]
@@ -82,6 +85,8 @@ namespace Oduncu.Sim
         TargetsBuildings = 1u << 19,
         Conquest = 1u << 20,
         Shoots = 1u << 21,
+        Wall = 1u << 22,
+        Gate = 1u << 23,
     }
 
     public enum AgeId : byte
@@ -140,7 +145,7 @@ namespace Oduncu.Sim
     public static partial class GameData
     {
         public const int GeneratedTicksPerSecond = 10;
-        public const int EntityKindCount = 48;
+        public const int EntityKindCount = 51;
         public const int TechCount = 35;
         public const int AgeCount = 4;
         public const int EconomyPresetCount = 12;
@@ -804,6 +809,48 @@ namespace Oduncu.Sim
                 Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 6, Size = 3,
                 Cost = new Cost(0, 175, 0, 0),
                 TrainTicks = 0, BuildTicks = 500, Population = 0, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[48] = new EntityDef
+            {
+                Kind = EntityKind.PalisadeWall, Key = "PalisadeWall", Name = "Palisade Wall", Category = EntityCategory.Building,
+                Tags = EntityTag.Wall | EntityTag.Building, MinAge = AgeId.Feudal,
+                MaxHp = 250, Attack = 0, MeleeArmor = 2, PierceArmor = 5,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
+                Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 2, Size = 1,
+                Cost = new Cost(0, 3, 0, 0),
+                TrainTicks = 0, BuildTicks = 50, Population = 0, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[49] = new EntityDef
+            {
+                Kind = EntityKind.StoneWall, Key = "StoneWall", Name = "Stone Wall", Category = EntityCategory.Building,
+                Tags = EntityTag.Wall | EntityTag.Building, MinAge = AgeId.Castle,
+                MaxHp = 1800, Attack = 0, MeleeArmor = 8, PierceArmor = 10,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
+                Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 2, Size = 1,
+                Cost = new Cost(0, 0, 0, 5),
+                TrainTicks = 0, BuildTicks = 80, Population = 0, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[50] = new EntityDef
+            {
+                Kind = EntityKind.Gate, Key = "Gate", Name = "Gate", Category = EntityCategory.Building,
+                Tags = EntityTag.Wall | EntityTag.Gate | EntityTag.Building, MinAge = AgeId.Feudal,
+                MaxHp = 1375, Attack = 0, MeleeArmor = 6, PierceArmor = 6,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
+                Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 3, Size = 1,
+                Cost = new Cost(0, 0, 0, 20),
+                TrainTicks = 0, BuildTicks = 150, Population = 0, Housing = 0,
                 ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
                 Trains = System.Array.Empty<EntityKind>(),
             };

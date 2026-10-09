@@ -2,13 +2,15 @@ namespace Oduncu.Sim
 {
     /// <summary>
     /// Static occupancy of the map. A cell is blocked when a building or resource stands on it.
-    /// Units never block cells; they push apart instead (soft separation).
+    /// Units never block cells; they push apart instead (soft separation). Gates block every player but their owner.
     /// </summary>
     public sealed class MapGrid
     {
         public readonly int Width;
         public readonly int Height;
         private readonly int[] _occupant;
+        /// <summary>Owner + 1 of the gate on a cell, or 0. A gate blocks everyone but its owner.</summary>
+        private readonly int[] _gateOwner;
 
         /// <summary>Bumped on every occupancy change so cached flow fields know they are stale.</summary>
         public int Version { get; private set; }
@@ -18,6 +20,7 @@ namespace Oduncu.Sim
             Width = width;
             Height = height;
             _occupant = new int[width * height];
+            _gateOwner = new int[width * height];
         }
 
         public bool InBounds(int x, int y) => x >= 0 && y >= 0 && x < Width && y < Height;
@@ -31,6 +34,24 @@ namespace Oduncu.Sim
 
         public bool IsFree(int x, int y) => InBounds(x, y) && _occupant[Index(x, y)] == 0;
         public bool IsFree(Cell c) => IsFree(c.X, c.Y);
+
+        /// <summary>Whether a player's units may walk on a cell: free, or the player's own gate. Player -1 means nobody's gates.</summary>
+        public bool IsPassable(int x, int y, int player)
+        {
+            if (!InBounds(x, y)) return false;
+            int i = Index(x, y);
+            return _occupant[i] == 0 || (player >= 0 && _gateOwner[i] == player + 1);
+        }
+
+        public bool IsPassable(Cell c, int player) => IsPassable(c.X, c.Y, player);
+
+        public void SetGate(CellRect r, int owner)
+        {
+            Version++;
+            for (int y = r.Y; y <= r.MaxY; y++)
+                for (int x = r.X; x <= r.MaxX; x++)
+                    _gateOwner[Index(x, y)] = owner + 1;
+        }
 
         public bool IsRectFree(CellRect r)
         {
@@ -55,7 +76,10 @@ namespace Oduncu.Sim
             Version++;
             for (int y = r.Y; y <= r.MaxY; y++)
                 for (int x = r.X; x <= r.MaxX; x++)
+                {
                     _occupant[Index(x, y)] = 0;
+                    _gateOwner[Index(x, y)] = 0;
+                }
         }
 
         public Cell Clamp(Cell c)
@@ -70,6 +94,7 @@ namespace Oduncu.Sim
             h.Write(Width);
             h.Write(Height);
             for (int i = 0; i < _occupant.Length; i++) h.Write(_occupant[i]);
+            for (int i = 0; i < _gateOwner.Length; i++) if (_gateOwner[i] != 0) { h.Write(i); h.Write(_gateOwner[i]); }
         }
     }
 }

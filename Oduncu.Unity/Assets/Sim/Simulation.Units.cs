@@ -55,7 +55,7 @@ namespace Oduncu.Sim
             {
                 // Large groups share one flow field until close, then each unit paths to its own slot.
                 Cell next;
-                if (Cell.Chebyshev(u.Cell, u.FlowGoal) > SimConstants.FlowHandoffDistance && _flowFields.NextCell(u.FlowGoal, u.Cell, out next))
+                if (Cell.Chebyshev(u.Cell, u.FlowGoal) > SimConstants.FlowHandoffDistance && _flowFields.NextCell(u.FlowGoal, u.Cell, u.Owner, out next))
                 {
                     StepToward(u, next, speed);
                     return;
@@ -65,7 +65,7 @@ namespace Oduncu.Sim
             }
             if (!u.HasPath)
             {
-                if (!_pathfinder.FindPathToCell(u.Cell, u.MoveTarget, u.Path)) { SetIdle(u); return; }
+                if (!_pathfinder.FindPathToCell(u.Cell, u.MoveTarget, u.Path, u.Owner)) { SetIdle(u); return; }
                 u.HasPath = true;
                 u.PathIndex = 0;
             }
@@ -96,7 +96,7 @@ namespace Oduncu.Sim
         {
             if (!u.HasPath || u.PathIndex >= u.Path.Count) return true;
             Cell next = u.Path[u.PathIndex];
-            if (!Map.IsFree(next))
+            if (!Map.IsPassable(next, u.Owner))
             {
                 // Something was built across the path; drop it so the owner state recomputes.
                 u.HasPath = false;
@@ -124,7 +124,7 @@ namespace Oduncu.Sim
             u.PathGoal = goal;
             u.PathAge = CurrentTick;
             u.PathIndex = 0;
-            return _pathfinder.FindPathAdjacentToRect(u.Cell, target.Footprint, u.Path);
+            return _pathfinder.FindPathAdjacentToRect(u.Cell, target.Footprint, u.Path, u.Owner);
         }
 
         private void SetIdle(Entity u)
@@ -220,13 +220,13 @@ namespace Oduncu.Sim
                 if (push.SqrMagnitude > maxPush * maxPush) push = push.Normalized * maxPush;
 
                 FPVector2 to = u.Position + push;
-                if (!Map.IsFree(to.ToCell()))
+                if (!Map.IsPassable(to.ToCell(), u.Owner))
                 {
                     to = new FPVector2(u.Position.X + push.X, u.Position.Y);
-                    if (!Map.IsFree(to.ToCell()))
+                    if (!Map.IsPassable(to.ToCell(), u.Owner))
                     {
                         to = new FPVector2(u.Position.X, u.Position.Y + push.Y);
-                        if (!Map.IsFree(to.ToCell())) continue;
+                        if (!Map.IsPassable(to.ToCell(), u.Owner)) continue;
                     }
                 }
                 u.Position = to;

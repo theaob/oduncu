@@ -69,7 +69,7 @@ namespace Oduncu.Sim
 
         /// <summary>
         /// Different kinds of finished building from an age that count toward the next age:
-        /// not the Town Center, houses or farms.
+        /// not the Town Center, houses, farms or walls.
         /// </summary>
         private int CountRequirementBuildings(int player, AgeId age)
         {
@@ -81,7 +81,7 @@ namespace Oduncu.Sim
                 Entity e = _entities[i];
                 if (!e.Alive || e.Owner != player || !e.IsBuilding || e.UnderConstruction) continue;
                 EntityDef d = e.Def;
-                if (d.MinAge != age || d.Kind == EntityKind.TownCenter || d.Housing > 0 || d.IsGatherable) continue;
+                if (d.MinAge != age || d.Kind == EntityKind.TownCenter || d.Housing > 0 || d.IsGatherable || d.HasTag(EntityTag.Wall)) continue;
                 if (seen[(int)d.Kind]) continue;
                 seen[(int)d.Kind] = true;
                 n++;
