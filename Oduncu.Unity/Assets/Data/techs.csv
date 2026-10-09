@@ -1,0 +1,5 @@
+# Researchable technologies. Ids are stored in command logs; never renumber or reuse.
+Id,Key,Name,ResearchedAt,MinAge,Food,Wood,Gold,Stone,ResearchSeconds,Requires,Description
+1,MeleeAttack1,Melee Attack I,Forge,Feudal,150,0,0,0,50,,+1 attack for infantry and cavalry
+2,MeleeAttack2,Melee Attack II,Forge,Castle,220,0,120,0,65,MeleeAttack1,+1 attack for infantry and cavalry
+3,MeleeAttack3,Melee Attack III,Forge,Imperial,275,0,225,0,75,MeleeAttack2,+2 attack for infantry and cavalry

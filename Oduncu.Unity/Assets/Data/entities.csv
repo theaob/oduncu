@@ -1,0 +1,10 @@
+# Units, buildings and resources. Ids are stored in command logs; never renumber or reuse.
+# Times are in seconds, Speed in tiles per second, Range in tiles. The generator converts to ticks.
+# Tags and Trains are semicolon-separated keys.
+Id,Key,Name,Category,Tags,MinAge,MaxHp,Attack,MeleeArmor,PierceArmor,Range,ReloadSeconds,Speed,LineOfSight,Size,Food,Wood,Gold,Stone,TrainSeconds,BuildSeconds,Population,ResourceAmount,Yields,Trains
+1,Villager,Villager,unit,gatherer;builder,Dark,25,3,0,0,1.6,1.5,0.8,4,1,50,0,0,0,20,0,1,0,,
+2,Militia,Militia,unit,military;infantry,Dark,40,4,1,0,1.6,1.5,0.9,6,1,60,0,20,0,21,0,1,0,,
+3,TownCenter,Town Center,building,dropoff_food;dropoff_wood;dropoff_gold;dropoff_stone,Dark,2400,0,3,5,0,0,0,8,3,0,275,0,100,0,150,0,0,,Villager
+4,Barracks,Barracks,building,,Dark,1200,0,2,2,0,0,0,6,3,0,175,0,0,0,35,0,0,,Militia
+5,Tree,Tree,resource,,Dark,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,100,Wood,
+6,Forge,Forge,building,,Feudal,1500,0,1,1,0,0,0,6,3,0,150,0,0,0,40,0,0,,

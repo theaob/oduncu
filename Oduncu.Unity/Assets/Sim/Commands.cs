@@ -13,6 +13,7 @@ namespace Oduncu.Sim
         Train = 4,
         Attack = 5,
         Stop = 6,
+        CancelTrain = 7,
     }
 
     /// <summary>
@@ -30,6 +31,10 @@ namespace Oduncu.Sim
         public int Target;
         public EntityKind EntityType;
         public Cell Cell;
+        /// <summary>Second cell for commands that span two points (walls, from milestone 1).</summary>
+        public Cell Cell2;
+        /// <summary>Small integer argument: queue slot for CancelTrain.</summary>
+        public int Arg;
 
         public static Command Move(int player, IEnumerable<int> units, Cell to)
             => new Command { Kind = CommandKind.Move, Player = player, Units = Normalize(units), Cell = to };
@@ -49,6 +54,9 @@ namespace Oduncu.Sim
         public static Command Stop(int player, IEnumerable<int> units)
             => new Command { Kind = CommandKind.Stop, Player = player, Units = Normalize(units) };
 
+        public static Command CancelTrain(int player, int buildingId, int slot)
+            => new Command { Kind = CommandKind.CancelTrain, Player = player, Target = buildingId, Arg = slot };
+
         private static int[] Normalize(IEnumerable<int> units)
         {
             if (units == null) return NoUnits;
@@ -67,6 +75,8 @@ namespace Oduncu.Sim
             h.Write(Target);
             h.Write((int)EntityType);
             h.Write(Cell);
+            h.Write(Cell2);
+            h.Write(Arg);
         }
 
         public void Write(BinaryWriter w)
@@ -79,6 +89,9 @@ namespace Oduncu.Sim
             w.Write((byte)EntityType);
             w.Write(Cell.X);
             w.Write(Cell.Y);
+            w.Write(Cell2.X);
+            w.Write(Cell2.Y);
+            w.Write(Arg);
         }
 
         public static Command Read(BinaryReader r)
@@ -97,17 +110,25 @@ namespace Oduncu.Sim
             int x = r.ReadInt32();
             int y = r.ReadInt32();
             c.Cell = new Cell(x, y);
+            int x2 = r.ReadInt32();
+            int y2 = r.ReadInt32();
+            c.Cell2 = new Cell(x2, y2);
+            c.Arg = r.ReadInt32();
             return c;
         }
 
         public override string ToString()
-            => Kind + " p" + Player + " units=" + Units.Length + " target=" + Target + " type=" + EntityType + " cell=" + Cell;
+            => Kind + " p" + Player + " units=" + Units.Length + " target=" + Target + " type=" + EntityType + " cell=" + Cell + " cell2=" + Cell2 + " arg=" + Arg;
     }
 
     /// <summary>Every command of a match, by tick. Replaying a log reproduces the match exactly.</summary>
     public sealed class CommandLog
     {
-        public const int FormatVersion = 1;
+        /// <summary>
+        /// Bumped whenever command kinds or fields change. Version 2 (milestone 1) adds CancelTrain
+        /// and the Cell2 and Arg fields; older logs are rejected rather than misread.
+        /// </summary>
+        public const int FormatVersion = 2;
 
         public readonly struct Entry
         {
@@ -158,7 +179,8 @@ namespace Oduncu.Sim
             using (var r = new BinaryReader(stream, System.Text.Encoding.UTF8, leaveOpen: true))
             {
                 int version = r.ReadInt32();
-                if (version != FormatVersion) throw new InvalidDataException("Unsupported command log version " + version);
+                if (version != FormatVersion)
+                    throw new InvalidDataException("Unsupported command log version " + version + "; this build reads version " + FormatVersion + " only.");
                 var log = new CommandLog { Seed = r.ReadInt32() };
                 int n = r.ReadInt32();
                 for (int i = 0; i < n; i++)

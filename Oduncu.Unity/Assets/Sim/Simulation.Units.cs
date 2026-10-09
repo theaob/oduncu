@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace Oduncu.Sim
 {
     public sealed partial class Simulation
@@ -35,10 +33,10 @@ namespace Oduncu.Sim
 
         private void UpdateMoving(Entity u)
         {
-            if (u.Path == null)
+            if (!u.HasPath)
             {
-                u.Path = new List<Cell>();
                 if (!_pathfinder.FindPathToCell(u.Cell, u.MoveTarget, u.Path)) { SetIdle(u); return; }
+                u.HasPath = true;
                 u.PathIndex = 0;
             }
             if (StepAlongPath(u)) SetIdle(u);
@@ -47,27 +45,27 @@ namespace Oduncu.Sim
         /// <summary>Move along the current path. Returns true when the path is finished or lost.</summary>
         private bool StepAlongPath(Entity u)
         {
-            if (u.Path == null || u.PathIndex >= u.Path.Count) return true;
+            if (!u.HasPath || u.PathIndex >= u.Path.Count) return true;
             Cell next = u.Path[u.PathIndex];
             if (!Map.IsFree(next))
             {
                 // Something was built across the path; drop it so the owner state recomputes.
-                u.Path = null;
+                u.HasPath = false;
                 return false;
             }
             FPVector2 target = FPVector2.CellCentre(next);
             FPVector2 delta = target - u.Position;
             FP dist = delta.Magnitude;
-            FP speed = u.Def.Speed;
+            FP speed = u.Stats.Speed;
             if (dist <= speed)
             {
                 u.Position = target;
-                u.Cell = next;
+                SetUnitCell(u, next);
                 u.PathIndex++;
                 return u.PathIndex >= u.Path.Count;
             }
             u.Position = u.Position + delta.Normalized * speed;
-            u.Cell = u.Position.ToCell();
+            SetUnitCell(u, u.Position.ToCell());
             return false;
         }
 
@@ -80,11 +78,11 @@ namespace Oduncu.Sim
         private bool EnsurePathTo(Entity u, Entity target)
         {
             Cell goal = target.Cell;
-            bool stale = u.Path == null
+            bool stale = !u.HasPath
                 || goal != u.PathGoal
                 || (target.IsUnit && CurrentTick - u.PathAge >= SimConstants.ChaseRepathInterval);
             if (!stale) return true;
-            if (u.Path == null) u.Path = new List<Cell>();
+            u.HasPath = true;
             u.PathGoal = goal;
             u.PathAge = CurrentTick;
             u.PathIndex = 0;
@@ -94,21 +92,28 @@ namespace Oduncu.Sim
         private void SetIdle(Entity u)
         {
             u.State = UnitState.Idle;
-            u.Path = null;
+            u.HasPath = false;
             u.TargetId = 0;
         }
 
         // ------------------------------------------------------------------ economy
 
-        private Entity FindNearestTree(Entity u)
+        /// <summary>Another resource of the kind the villager was gathering, when its source runs out.</summary>
+        private Entity FindNextResource(Entity u)
         {
-            return FindNearest(u.Position, SimConstants.ResourceSearchRadius, e => e.Kind == EntityKind.Tree && e.Amount > 0);
+            if (u.GatherKind == EntityKind.None) return null;
+            var filter = new EntityFilter { Kind = u.GatherKind, WithAmount = true };
+            return FindNearest(u.Position, SimConstants.ResourceSearchRadius, ref filter);
         }
 
         private Entity FindNearestDropOff(Entity u)
         {
-            int owner = u.Owner;
-            return FindNearest(u.Position, Map.Width + Map.Height, e => e.IsBuilding && e.Def.IsDropOff && e.Owner == owner && !e.UnderConstruction);
+            var filter = new EntityFilter
+            {
+                Owner = OwnerMatch.Owned, Player = u.Owner, Complete = true,
+                DropOff = true, DropOffKind = u.CarryKind,
+            };
+            return FindNearest(u.Position, Map.Width + Map.Height, ref filter);
         }
 
         private void UpdateGathering(Entity u)
@@ -116,16 +121,17 @@ namespace Oduncu.Sim
             Entity source = Find(u.GatherSourceId);
             if (source == null || !source.IsResource || source.Amount <= 0)
             {
-                source = FindNearestTree(u);
+                source = FindNextResource(u);
                 if (source == null)
                 {
-                    if (u.Carry > 0) { u.State = UnitState.Returning; u.Path = null; }
+                    if (u.Carry > 0) { u.State = UnitState.Returning; u.HasPath = false; }
                     else SetIdle(u);
                     return;
                 }
                 u.GatherSourceId = source.Id;
-                u.Path = null;
+                u.HasPath = false;
             }
+            u.GatherKind = source.Kind;
 
             if (!IsAdjacent(u, source))
             {
@@ -134,7 +140,14 @@ namespace Oduncu.Sim
                 return;
             }
 
-            u.Path = null;
+            u.HasPath = false;
+            ResourceKind yields = source.Def.Yields;
+            if (u.CarryKind != yields)
+            {
+                // Switching resource drops whatever was carried, as in AoE2.
+                u.Carry = 0;
+                u.CarryKind = yields;
+            }
             u.WorkTimer++;
             if (u.WorkTimer < SimConstants.GatherTicks) return;
             u.WorkTimer = 0;
@@ -144,7 +157,7 @@ namespace Oduncu.Sim
             if (u.Carry >= SimConstants.VillagerCarryCapacity)
             {
                 u.State = UnitState.Returning;
-                u.Path = null;
+                u.HasPath = false;
             }
         }
 
@@ -158,10 +171,10 @@ namespace Oduncu.Sim
                 StepAlongPath(u);
                 return;
             }
-            Players[u.Owner].Wood += u.Carry;
+            Players[u.Owner].Add(u.CarryKind, u.Carry);
             u.Carry = 0;
             u.State = UnitState.Gathering;
-            u.Path = null;
+            u.HasPath = false;
         }
 
         private void UpdateBuildingWork(Entity u)
@@ -178,11 +191,12 @@ namespace Oduncu.Sim
                 StepAlongPath(u);
                 return;
             }
-            u.Path = null;
+            u.HasPath = false;
             site.BuildProgress++;
-            int max = site.Def.MaxHp;
-            site.Hp = 1 + (int)((long)(max - 1) * site.BuildProgress / site.Def.BuildTicks);
-            if (site.BuildProgress >= site.Def.BuildTicks)
+            int max = site.Stats.MaxHp;
+            int buildTicks = site.Stats.BuildTicks;
+            site.Hp = 1 + (int)((long)(max - 1) * site.BuildProgress / buildTicks);
+            if (site.BuildProgress >= buildTicks)
             {
                 site.UnderConstruction = false;
                 site.Hp = max;
@@ -197,7 +211,7 @@ namespace Oduncu.Sim
                 u.GatherSourceId = u.PreviousGatherSourceId;
                 u.PreviousGatherSourceId = 0;
                 u.State = UnitState.Gathering;
-                u.Path = null;
+                u.HasPath = false;
                 u.WorkTimer = 0;
                 return;
             }
@@ -209,18 +223,18 @@ namespace Oduncu.Sim
         private void AutoEngage(Entity u)
         {
             if ((CurrentTick + u.Id) % SimConstants.AutoEngageInterval != 0) return;
-            int owner = u.Owner;
-            Entity target = FindNearest(u.Position, u.Def.LineOfSight, e => e.Owner >= 0 && e.Owner != owner && (e.IsUnit || e.IsBuilding));
+            var filter = new EntityFilter { Owner = OwnerMatch.Enemy, Player = u.Owner };
+            Entity target = FindNearest(u.Position, u.Stats.LineOfSight, ref filter);
             if (target == null) return;
             u.State = UnitState.Attacking;
             u.TargetId = target.Id;
-            u.Path = null;
+            u.HasPath = false;
         }
 
         private bool InRange(Entity u, Entity target)
         {
             FP d = FPVector2.Distance(u.Position, NearestPointOf(target, u.Position));
-            return d <= u.Def.Range;
+            return d <= u.Stats.Range;
         }
 
         private void UpdateAttacking(Entity u)
@@ -230,10 +244,10 @@ namespace Oduncu.Sim
 
             if (InRange(u, target))
             {
-                u.Path = null;
+                u.HasPath = false;
                 if (u.Cooldown > 0) return;
-                u.Cooldown = u.Def.AttackTicks;
-                int damage = u.Def.Attack - target.Def.Armor;
+                u.Cooldown = u.Stats.AttackTicks;
+                int damage = u.Stats.Attack - target.Stats.MeleeArmor;
                 if (damage < 1) damage = 1;
                 target.Hp -= damage;
                 if (target.Hp <= 0) Kill(target);

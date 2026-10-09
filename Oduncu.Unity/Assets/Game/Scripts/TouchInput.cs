@@ -121,7 +121,7 @@ namespace Oduncu.Game
             else if (hit.IsResource && selected.Def.CanGather)
             {
                 _runner.Enqueue(Command.Gather(player, units, hit.Id));
-                _status = "Gathering wood.";
+                _status = "Gathering " + hit.Def.Name + ".";
             }
             else if (hit.Owner >= 0 && hit.Owner != player)
             {
@@ -150,7 +150,9 @@ namespace Oduncu.Game
             int player = _runner.LocalPlayer;
             GUI.skin.button.fontSize = 28;
             GUI.skin.label.fontSize = 28;
-            GUI.Label(new Rect(16, 8, 900, 40), "Wood " + sim.Players[player].Wood + "   Pop " + sim.CountUnits(player) + "/" + SimConstants.PopulationCap + "   Tick " + sim.CurrentTick);
+            PlayerState me = sim.Players[player];
+            GUI.Label(new Rect(16, 8, 1400, 40), "Food " + me.Food + "   Wood " + me.Wood + "   Gold " + me.Gold + "   Stone " + me.Stone
+                + "   Pop " + sim.CountUnits(player) + "/" + SimConstants.PopulationCap + "   Tick " + sim.CurrentTick);
             GUI.Label(new Rect(16, 48, 1200, 40), _status + (sim.LastRejection != null ? "   (last rejection: " + sim.LastRejection + ")" : ""));
 
             Entity selected = sim.Find(_selectedId);
@@ -160,7 +162,7 @@ namespace Oduncu.Game
             {
                 foreach (EntityKind kind in selected.Def.Trains)
                 {
-                    if (GUI.Button(new Rect(x, y, 320, 56), "Train " + EntityDefs.Get(kind).Name + " (" + EntityDefs.Get(kind).CostWood + ")"))
+                    if (GUI.Button(new Rect(x, y, 320, 56), "Train " + EntityDefs.Get(kind).Name + " (" + me.Stats.Of(kind).Cost + ")"))
                     {
                         _runner.Enqueue(Command.Train(player, selected.Id, kind));
                     }
@@ -170,7 +172,7 @@ namespace Oduncu.Game
             }
             else if (selected != null && selected.Def.CanBuild)
             {
-                if (GUI.Button(new Rect(x, y, 360, 56), _placingBarracks ? "Tap ground to place" : "Build Barracks (175)"))
+                if (GUI.Button(new Rect(x, y, 360, 56), _placingBarracks ? "Tap ground to place" : "Build Barracks (" + me.Stats.Of(EntityKind.Barracks).Cost.Wood + "W)"))
                 {
                     _placingBarracks = !_placingBarracks;
                 }
