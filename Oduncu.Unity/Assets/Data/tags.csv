@@ -1,0 +1,14 @@
+# Entity tags. Ids are bit positions in the generated EntityTag flags enum; never renumber.
+Id,Key,Meaning
+0,military,Auto-engages enemies and counts as army
+1,gatherer,Can gather resources
+2,builder,Can construct and repair buildings
+3,infantry,Infantry line (Barracks)
+4,cavalry,Cavalry line (Stable)
+5,archer,Archer line (Archery Range)
+6,siege,Siege weapons
+7,monk,Monks
+8,dropoff_food,Accepts food
+9,dropoff_wood,Accepts wood
+10,dropoff_gold,Accepts gold
+11,dropoff_stone,Accepts stone

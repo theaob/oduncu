@@ -22,8 +22,14 @@ jobs:
       - name: Build
         run: dotnet build Oduncu.Sim.Tests/Oduncu.Sim.Tests.csproj --no-restore -c Release
 
+      - name: Check generated data is current
+        run: dotnet run --project tools/DataGen -- -check
+
       - name: Test
-        run: dotnet test Oduncu.Sim.Tests/Oduncu.Sim.Tests.csproj --no-build -c Release --logger "trx;LogFileName=sim-tests.trx"
+        run: dotnet test Oduncu.Sim.Tests/Oduncu.Sim.Tests.csproj --no-build -c Release --filter "TestCategory!=Benchmark" --logger "trx;LogFileName=sim-tests.trx"
+
+      - name: Benchmark (report only)
+        run: dotnet test Oduncu.Sim.Tests/Oduncu.Sim.Tests.csproj --no-build -c Release --filter "TestCategory=Benchmark" --logger "console;verbosity=detailed"
 
       - name: Upload test results
         if: always()

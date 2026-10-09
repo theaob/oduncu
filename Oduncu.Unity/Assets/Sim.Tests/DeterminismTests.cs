@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using Oduncu.Sim;
 
@@ -37,6 +38,36 @@ namespace Oduncu.Sim.Tests
             ulong replayHash = Scenarios.Replay(MapGenerator.CreateDefault(loaded.Seed), loaded, Scenarios.DeterminismTicks, replayed);
             for (int i = 0; i < live.Count; i++) Assert.AreEqual(live[i], replayed[i], "replay diverged at checkpoint " + i);
             Assert.AreEqual(liveHash, replayHash);
+        }
+
+        /// <summary>The README carries the reference hash devices are checked against; keep it in step with the rules.</summary>
+        [Test]
+        public void ReadmeReferenceHashMatches()
+        {
+            string readme = FindReadme();
+            if (readme == null)
+            {
+                Assert.Inconclusive("README.md not found from the test directory.");
+                return;
+            }
+            Match m = Regex.Match(File.ReadAllText(readme), @"DETERMINISM_HASH ([0-9A-F]{16})");
+            Assert.IsTrue(m.Success, "README has no DETERMINISM_HASH line");
+            ulong hash = Scenarios.RunScripted(Scenarios.CreateDeterminismScenario(), Scenarios.DeterminismTicks);
+            Assert.AreEqual(m.Groups[1].Value, hash.ToString("X16"), "update the reference hash in README.md");
+        }
+
+        private static string FindReadme()
+        {
+            string[] starts = { TestContext.CurrentContext.TestDirectory, Directory.GetCurrentDirectory() };
+            foreach (string start in starts)
+            {
+                for (string dir = start; !string.IsNullOrEmpty(dir); dir = Path.GetDirectoryName(dir))
+                {
+                    string path = Path.Combine(dir, "README.md");
+                    if (File.Exists(path) && Directory.Exists(Path.Combine(dir, "Oduncu.Unity"))) return path;
+                }
+            }
+            return null;
         }
 
         [Test]

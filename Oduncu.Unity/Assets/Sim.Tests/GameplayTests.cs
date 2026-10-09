@@ -73,25 +73,26 @@ namespace Oduncu.Sim.Tests
         }
 
         [Test]
-        public void TownCenterTrainsVillagerAndChargesWood()
+        public void TownCenterTrainsVillagerAndChargesFood()
         {
             Entity tc, v, tree;
             var sim = SmallMap(out tc, out v, out tree);
             Run(sim, 1, Command.Train(0, tc.Id, EntityKind.Villager));
-            Assert.AreEqual(SimConstants.StartingWood - 50, sim.Players[0].Wood);
+            Assert.AreEqual(SimConstants.StartingResources.Food - 50, sim.Players[0].Food);
+            Assert.AreEqual(SimConstants.StartingResources.Wood, sim.Players[0].Wood);
             Run(sim, 210);
             Assert.AreEqual(2, sim.CountUnits(0));
         }
 
         [Test]
-        public void TrainIsRejectedWithoutWood()
+        public void TrainIsRejectedWithoutFood()
         {
             Entity tc, v, tree;
             var sim = SmallMap(out tc, out v, out tree);
-            sim.Players[0].Wood = 10;
+            sim.Players[0].Food = 10;
             Run(sim, 1, Command.Train(0, tc.Id, EntityKind.Villager));
             Assert.AreEqual(0, tc.TrainQueue.Count);
-            Assert.AreEqual("not enough wood", sim.LastRejection);
+            Assert.AreEqual("not enough food", sim.LastRejection);
         }
 
         [Test]

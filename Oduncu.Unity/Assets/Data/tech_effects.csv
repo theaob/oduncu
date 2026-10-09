@@ -1,0 +1,9 @@
+# What each tech changes. Target is an entity key, tag:<tag key>, or all.
+# Op is add or mul. Values use the stat's CSV unit (seconds for times, tiles per second for Speed).
+Tech,Target,Stat,Op,Value
+MeleeAttack1,tag:infantry,Attack,add,1
+MeleeAttack1,tag:cavalry,Attack,add,1
+MeleeAttack2,tag:infantry,Attack,add,1
+MeleeAttack2,tag:cavalry,Attack,add,1
+MeleeAttack3,tag:infantry,Attack,add,2
+MeleeAttack3,tag:cavalry,Attack,add,2

@@ -101,6 +101,69 @@ namespace Oduncu.Sim
             }
         }
 
+        // ------------------------------------------------------------------ benchmark
+
+        public const int BenchmarkMapSize = 64;
+        public const int BenchmarkUnitsPerPlayer = 75;
+
+        /// <summary>
+        /// The section 12.4 load for a 1v1: a 64x64 map, 75 units a side (45 villagers, 30
+        /// militia), about 400 trees and a handful of buildings. Spawned directly, ignoring the
+        /// population cap, so the benchmark measures the full-population tick cost.
+        /// </summary>
+        public static Simulation CreateFullPopulationBenchmark(int seed)
+        {
+            int size = BenchmarkMapSize;
+            var sim = new Simulation(size, size, 2, (ulong)seed);
+            var rng = new DeterministicRandom((ulong)seed * 104729UL + 3UL);
+            sim.SpawnStructure(EntityKind.TownCenter, 0, new Cell(4, 4), false);
+            sim.SpawnStructure(EntityKind.TownCenter, 1, new Cell(size - 7, size - 7), false);
+            sim.SpawnStructure(EntityKind.Barracks, 0, new Cell(10, 4), false);
+            sim.SpawnStructure(EntityKind.Barracks, 1, new Cell(size - 13, size - 7), false);
+            sim.SpawnStructure(EntityKind.Forge, 0, new Cell(4, 10), false);
+            sim.SpawnStructure(EntityKind.Forge, 1, new Cell(size - 7, size - 13), false);
+
+            int trees = 0;
+            for (int attempt = 0; attempt < 400 && trees < 400; attempt++)
+            {
+                int cx = rng.Next(2, size - 2), cy = rng.Next(2, size - 2);
+                if (cx + cy < 24 || cx + cy > 2 * size - 26) continue; // keep the bases clear
+                int radius = rng.Next(2, 4);
+                for (int y = cy - radius; y <= cy + radius && trees < 400; y++)
+                    for (int x = cx - radius; x <= cx + radius && trees < 400; x++)
+                        if (rng.Chance(70) && sim.SpawnStructure(EntityKind.Tree, SimConstants.NeutralOwner, new Cell(x, y), false) != null) trees++;
+            }
+
+            for (int p = 0; p < 2; p++)
+            {
+                for (int i = 0; i < BenchmarkUnitsPerPlayer; i++)
+                {
+                    EntityKind kind = i < 45 ? EntityKind.Villager : EntityKind.Militia;
+                    int x = 3 + (i % 15), y = 15 + i / 15;
+                    var cell = p == 0 ? new Cell(x, y) : new Cell(size - 1 - x, size - 1 - y);
+                    sim.SpawnUnit(kind, p, cell);
+                }
+            }
+            return sim;
+        }
+
+        /// <summary>Villagers gather and both armies march to the map centre on tick 1, where they meet and fight.</summary>
+        public static void FillBenchmarkCommands(Simulation sim, int tick, List<Command> output)
+        {
+            if (tick != 1) return;
+            var centre = new Cell(sim.Map.Width / 2, sim.Map.Height / 2);
+            for (int p = 0; p < sim.Players.Length; p++)
+            {
+                foreach (Entity v in CollectOwned(sim, p, EntityKind.Villager))
+                {
+                    Entity tree = sim.FindNearest(v.Position, 40, e => e.Kind == EntityKind.Tree && e.Amount > 0);
+                    if (tree != null) output.Add(Command.Gather(p, new[] { v.Id }, tree.Id));
+                }
+                var militia = CollectOwned(sim, p, EntityKind.Militia);
+                if (militia.Count > 0) output.Add(Command.Move(p, Ids(militia), centre));
+            }
+        }
+
         public static Entity FindOwned(Simulation sim, int owner, EntityKind kind)
         {
             var list = sim.Entities;

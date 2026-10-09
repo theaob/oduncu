@@ -14,7 +14,8 @@ namespace Oduncu.Sim
         /// <summary>Milestone 0 has no houses; every player gets a fixed population cap.</summary>
         public const int PopulationCap = 20;
 
-        public const int StartingWood = 200;
+        /// <summary>Standard start stockpile: food, wood, gold, stone.</summary>
+        public static readonly Cost StartingResources = new Cost(200, 200, 100, 200);
 
         public const int TrainQueueLength = 5;
 
