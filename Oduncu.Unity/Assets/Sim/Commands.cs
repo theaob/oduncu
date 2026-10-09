@@ -25,6 +25,7 @@ namespace Oduncu.Sim
         AgeUp = 16,
         MarketBuy = 17,
         MarketSell = 18,
+        BuildWall = 19,
     }
 
     public enum Stance : byte
@@ -114,6 +115,10 @@ namespace Oduncu.Sim
         public static Command MarketSell(int player, int marketId, ResourceKind kind)
             => new Command { Kind = CommandKind.MarketSell, Player = player, Target = marketId, Arg = (int)kind };
 
+        /// <summary>Villagers lay a straight wall (or line of gates) from one cell to another.</summary>
+        public static Command BuildWall(int player, IEnumerable<int> villagers, EntityKind wall, Cell from, Cell to)
+            => new Command { Kind = CommandKind.BuildWall, Player = player, Units = Normalize(villagers), EntityType = wall, Cell = from, Cell2 = to };
+
         private static int[] Normalize(IEnumerable<int> units)
         {
             if (units == null) return NoUnits;
@@ -185,9 +190,10 @@ namespace Oduncu.Sim
         /// Bumped whenever command kinds or fields change; older logs are rejected rather than
         /// misread. Version 2 added CancelTrain and the Cell2 and Arg fields; version 3 adds
         /// SetRally, Repair, SetAutoQueue and SetEconomyTargets; version 4 adds Garrison,
-        /// Ungarrison and SetStance; version 5 adds Research, AgeUp, MarketBuy and MarketSell.
+        /// Ungarrison and SetStance; version 5 adds Research, AgeUp, MarketBuy and MarketSell;
+        /// version 6 adds BuildWall.
         /// </summary>
-        public const int FormatVersion = 5;
+        public const int FormatVersion = 6;
 
         public readonly struct Entry
         {

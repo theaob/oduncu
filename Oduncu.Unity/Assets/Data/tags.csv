@@ -22,3 +22,5 @@ Id,Key,Meaning
 19,targets_buildings,Can only attack buildings (rams and trebuchets)
 20,conquest,A player keeps playing while they own one of these finished (design section 3)
 21,shoots,Building that fires arrows at enemies in range
+22,wall,Wall segments and gates; not counted for age requirements or conquest
+23,gate,Wall segment the owner's units walk through

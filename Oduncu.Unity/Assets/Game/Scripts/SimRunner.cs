@@ -33,7 +33,7 @@ namespace Oduncu.Game
 
         private void Awake()
         {
-            Sim = MapGenerator.CreateDefault(Seed);
+            Sim = OpenMap.Create(Seed);
         }
 
         public void Enqueue(Command command)

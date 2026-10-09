@@ -18,6 +18,7 @@ namespace Oduncu.Sim
         public readonly PlayerState[] Players;
         public readonly DeterministicRandom Rng;
         public readonly SpatialIndex Index;
+        public readonly FogOfWar Fog;
         public int CurrentTick { get; private set; }
 
         private readonly List<Entity> _entities = new List<Entity>(1024);
@@ -39,6 +40,7 @@ namespace Oduncu.Sim
             if (playerCount < 1 || playerCount > SimConstants.MaxPlayers) throw new ArgumentOutOfRangeException(nameof(playerCount));
             Map = new MapGrid(width, height);
             Index = new SpatialIndex(width, height);
+            Fog = new FogOfWar(width, height, playerCount);
             Players = new PlayerState[playerCount];
             for (int i = 0; i < playerCount; i++)
             {
@@ -61,6 +63,7 @@ namespace Oduncu.Sim
         {
             CurrentTick++;
             TopUpPool();
+            if (_fogDirty) UpdateFog();
             if (commands != null)
             {
                 for (int i = 0; i < commands.Count; i++) ApplyCommand(commands[i]);
@@ -84,6 +87,7 @@ namespace Oduncu.Sim
             SeparateUnits();
             RemoveDead();
             UpdatePlayersAlive();
+            UpdateFog();
         }
 
         public ulong ComputeHash()
@@ -95,11 +99,13 @@ namespace Oduncu.Sim
             _hasher.Write(Winner);
             _hasher.Write(MatchEndTick);
             WriteMarketState(_hasher);
+            _hasher.Write((int)Reveal);
             _hasher.Write(_projectiles.Count);
             for (int i = 0; i < _projectiles.Count; i++) _projectiles[i].WriteState(_hasher);
             for (int i = 0; i < Players.Length; i++) Players[i].WriteState(_hasher);
             for (int i = 0; i < _entities.Count; i++) _entities[i].WriteState(_hasher);
             Map.WriteState(_hasher);
+            Fog.WriteState(_hasher);
             return _hasher.Value;
         }
 
@@ -141,6 +147,7 @@ namespace Oduncu.Sim
                 if (underConstruction) e.Hp = 1;
             }
             Map.Occupy(rect, e.Id);
+            if (def.HasTag(EntityTag.Gate)) Map.SetGate(rect, owner);
             Index.Add(e);
             return e;
         }
@@ -151,6 +158,7 @@ namespace Oduncu.Sim
             e.Reset(_nextId++, kind, def, owner, StatsFor(owner, kind));
             _entities.Add(e);
             _byId.Add(e.Id, e);
+            _fogDirty = true;
             return e;
         }
 

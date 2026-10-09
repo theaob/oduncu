@@ -29,6 +29,8 @@ namespace Oduncu.Sim
         private int _heapCount;
         private int _stamp;
         private int _serial;
+        /// <summary>Whose gates count as open for the current search; -1 for nobody's.</summary>
+        private int _player = -1;
 
         private static readonly int[] Dx = { 1, -1, 0, 0, 1, 1, -1, -1 };
         private static readonly int[] Dy = { 0, 0, 1, -1, 1, -1, 1, -1 };
@@ -44,16 +46,19 @@ namespace Oduncu.Sim
         }
 
         /// <summary>Path to a cell. If the goal is blocked, paths to a free cell adjacent to it.</summary>
-        public bool FindPathToCell(Cell start, Cell goal, List<Cell> result)
+        /// <remarks>Player is whose gates are open to the walker; -1 treats every gate as a wall.</remarks>
+        public bool FindPathToCell(Cell start, Cell goal, List<Cell> result, int player = -1)
         {
+            _player = player;
             var rect = new CellRect(goal.X, goal.Y, 1);
-            if (_map.IsFree(goal)) return Search(start, rect, 0, result);
+            if (_map.IsPassable(goal, player)) return Search(start, rect, 0, result);
             return Search(start, rect, 1, result);
         }
 
-        /// <summary>Path to any free cell touching the rect (chessboard distance 1).</summary>
-        public bool FindPathAdjacentToRect(Cell start, CellRect rect, List<Cell> result)
+        /// <summary>Path to any passable cell touching the rect (chessboard distance 1).</summary>
+        public bool FindPathAdjacentToRect(Cell start, CellRect rect, List<Cell> result, int player = -1)
         {
+            _player = player;
             return Search(start, rect, 1, result);
         }
 
@@ -92,11 +97,11 @@ namespace Oduncu.Sim
                 {
                     int nx = c.X + Dx[d];
                     int ny = c.Y + Dy[d];
-                    if (!_map.IsFree(nx, ny)) continue;
+                    if (!_map.IsPassable(nx, ny, _player)) continue;
                     if (d >= 4)
                     {
-                        // No corner cutting: both orthogonal neighbours must be free.
-                        if (!_map.IsFree(c.X + Dx[d], c.Y) || !_map.IsFree(c.X, c.Y + Dy[d])) continue;
+                        // No corner cutting: both orthogonal neighbours must be passable.
+                        if (!_map.IsPassable(c.X + Dx[d], c.Y, _player) || !_map.IsPassable(c.X, c.Y + Dy[d], _player)) continue;
                     }
                     int ni = _map.Index(nx, ny);
                     if (_closedStamp[ni] == _stamp) continue;

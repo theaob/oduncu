@@ -31,6 +31,7 @@ namespace Oduncu.Sim
                 case CommandKind.AgeUp: ApplyAgeUp(c); break;
                 case CommandKind.MarketBuy: ApplyMarketBuy(c); break;
                 case CommandKind.MarketSell: ApplyMarketSell(c); break;
+                case CommandKind.BuildWall: ApplyBuildWall(c); break;
                 default: Reject("unknown command"); break;
             }
         }
@@ -61,6 +62,7 @@ namespace Oduncu.Sim
         private void ApplyGather(Command c)
         {
             Entity source = Find(c.Target);
+            if (source != null && !CanSee(c.Player, source)) { Reject("you cannot see that"); return; }
             if (!CanGather(source, c.Player)) { Reject("cannot gather that"); return; }
             for (int i = 0; i < c.Units.Length; i++)
             {
@@ -142,6 +144,7 @@ namespace Oduncu.Sim
         {
             Entity target = Find(c.Target);
             if (!IsAttackable(target) || target.Owner == c.Player) { Reject("invalid attack target"); return; }
+            if (!CanSee(c.Player, target)) { Reject("you cannot see that"); return; }
             for (int i = 0; i < c.Units.Length; i++)
             {
                 Entity u = OwnedUnit(c, c.Units[i]);
@@ -179,7 +182,7 @@ namespace Oduncu.Sim
             if (b == null) { Reject("not your building"); return; }
             if (b.Def.Trains.Length == 0) { Reject("building trains nothing"); return; }
             Entity target = c.Arg != 0 ? Find(c.Arg) : null;
-            if (c.Arg != 0 && target == null) { Reject("rally target is gone"); return; }
+            if (c.Arg != 0 && (target == null || !CanSee(c.Player, target))) { Reject("rally target is gone"); return; }
             Cell cell = target != null ? target.Cell : c.Cell;
             if (!Map.InBounds(cell)) { Reject("rally point out of bounds"); return; }
             b.HasRally = true;

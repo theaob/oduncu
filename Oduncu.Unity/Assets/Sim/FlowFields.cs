@@ -23,6 +23,7 @@ namespace Oduncu.Sim
         {
             public bool Valid;
             public Cell Goal;
+            public int Player;
             public int MapVersion;
             public long LastUsed;
             public int[] Cost;
@@ -58,18 +59,21 @@ namespace Oduncu.Sim
         /// The next cell on a shortest path from a cell toward the goal. False when the cell is
         /// the goal (or touches a blocked goal) or the goal cannot be reached from it.
         /// </summary>
-        public bool NextCell(Cell goal, Cell from, out Cell next)
+        public bool NextCell(Cell goal, Cell from, out Cell next) => NextCell(goal, from, -1, out next);
+
+        /// <summary>As NextCell, for a walker whose own gates are open (player -1: nobody's).</summary>
+        public bool NextCell(Cell goal, Cell from, int player, out Cell next)
         {
             next = from;
             if (!_map.InBounds(from)) return false;
-            int[] cost = Get(goal);
+            int[] cost = Get(goal, player);
             int here = cost[_map.Index(from.X, from.Y)];
             if (here == 0) return false;
             int best = Unreachable;
             for (int d = 0; d < 8; d++)
             {
                 int nx = from.X + Dx[d], ny = from.Y + Dy[d];
-                if (!CanStep(from.X, from.Y, d)) continue;
+                if (!CanStep(from.X, from.Y, d, player)) continue;
                 int c = cost[_map.Index(nx, ny)];
                 if (c == Unreachable) continue;
                 int total = c + (d < 4 ? StraightCost : DiagonalCost);
@@ -86,17 +90,17 @@ namespace Oduncu.Sim
         public int CostAt(Cell goal, Cell from)
         {
             if (!_map.InBounds(from)) return Unreachable;
-            return Get(goal)[_map.Index(from.X, from.Y)];
+            return Get(goal, -1)[_map.Index(from.X, from.Y)];
         }
 
-        private int[] Get(Cell goal)
+        private int[] Get(Cell goal, int player)
         {
             _useCounter++;
             Field victim = null;
             for (int i = 0; i < _fields.Length; i++)
             {
                 Field f = _fields[i];
-                if (f.Valid && f.Goal == goal && f.MapVersion == _map.Version)
+                if (f.Valid && f.Goal == goal && f.Player == player && f.MapVersion == _map.Version)
                 {
                     f.LastUsed = _useCounter;
                     return f.Cost;
@@ -104,36 +108,37 @@ namespace Oduncu.Sim
                 // Reuse an empty slot first, otherwise the least recently used one.
                 if (victim == null || (victim.Valid && (!f.Valid || f.LastUsed < victim.LastUsed))) victim = f;
             }
-            Compute(victim, goal);
+            Compute(victim, goal, player);
             victim.LastUsed = _useCounter;
             return victim.Cost;
         }
 
-        private bool CanStep(int x, int y, int d)
+        private bool CanStep(int x, int y, int d, int player)
         {
             int nx = x + Dx[d], ny = y + Dy[d];
-            if (!_map.IsFree(nx, ny)) return false;
+            if (!_map.IsPassable(nx, ny, player)) return false;
             // No corner cutting, the same rule as the A* pathfinder.
-            return d < 4 || (_map.IsFree(x + Dx[d], y) && _map.IsFree(x, y + Dy[d]));
+            return d < 4 || (_map.IsPassable(x + Dx[d], y, player) && _map.IsPassable(x, y + Dy[d], player));
         }
 
-        private void Compute(Field f, Cell goal)
+        private void Compute(Field f, Cell goal, int player)
         {
             Computations++;
             f.Valid = true;
             f.Goal = goal;
+            f.Player = player;
             f.MapVersion = _map.Version;
             int[] cost = f.Cost;
             for (int i = 0; i < cost.Length; i++) cost[i] = Unreachable;
             _heapCount = 0;
 
-            if (_map.IsFree(goal)) Seed(cost, goal.X, goal.Y);
+            if (_map.IsPassable(goal, player)) Seed(cost, goal.X, goal.Y);
             else
             {
                 // Blocked goal: every free cell touching it is a destination, as in A*.
                 for (int dy = -1; dy <= 1; dy++)
                     for (int dx = -1; dx <= 1; dx++)
-                        if ((dx != 0 || dy != 0) && _map.IsFree(goal.X + dx, goal.Y + dy)) Seed(cost, goal.X + dx, goal.Y + dy);
+                        if ((dx != 0 || dy != 0) && _map.IsPassable(goal.X + dx, goal.Y + dy, player)) Seed(cost, goal.X + dx, goal.Y + dy);
             }
 
             while (_heapCount > 0)
@@ -144,7 +149,7 @@ namespace Oduncu.Sim
                 for (int d = 0; d < 8; d++)
                 {
                     // Moves are symmetric, so stepping out from c is the same test as stepping into c.
-                    if (!CanStep(c.X, c.Y, d)) continue;
+                    if (!CanStep(c.X, c.Y, d, player)) continue;
                     int ni = _map.Index(c.X + Dx[d], c.Y + Dy[d]);
                     int nc = item.Cost + (d < 4 ? StraightCost : DiagonalCost);
                     if (nc >= cost[ni]) continue;
