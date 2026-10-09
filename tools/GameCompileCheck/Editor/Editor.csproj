@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Compiles Assets/Game/Editor (the Oduncu.Game.Editor assembly) against UnityEditor reference assemblies. -->
+  <PropertyGroup>
+    <AssemblyName>Oduncu.Game.Editor</AssemblyName>
+    <DefineConstants>$(UnityDefines);UNITY_EDITOR</DefineConstants>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- UnityEditor 2021.1 against 2021.3 engine modules: version mismatch warnings are expected. -->
+    <NoWarn>$(NoWarn);MSB3277;NU1701</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../../Oduncu.Unity/Assets/Game/Editor/**/*.cs" />
+    <PackageReference Include="Unity3D.SDK" Version="2021.1.14.1" ExcludeAssets="all" GeneratePathProperty="true" />
+    <Reference Include="$(PkgUnity3D_SDK)/lib/UnityEditor.dll" Private="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../Oduncu.Sim/Oduncu.Sim.csproj" />
+    <ProjectReference Include="../Game/Game.csproj" />
+  </ItemGroup>
+</Project>

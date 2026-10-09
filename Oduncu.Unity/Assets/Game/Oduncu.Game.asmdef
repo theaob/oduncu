@@ -2,7 +2,8 @@
     "name": "Oduncu.Game",
     "rootNamespace": "Oduncu.Game",
     "references": [
-        "Oduncu.Sim"
+        "Oduncu.Sim",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

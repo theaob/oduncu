@@ -1,0 +1,24 @@
+<Project>
+  <!-- Shared settings for compiling the Unity game scripts outside Unity. See README.md. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+    <!-- Must match the com.unity.inputsystem version in Oduncu.Unity/Packages/manifest.json. -->
+    <InputSystemVersion>1.14.2</InputSystemVersion>
+    <InputSystemSource>$(MSBuildThisFileDirectory).cache/InputSystem-$(InputSystemVersion)/Packages/com.unity.inputsystem/InputSystem/</InputSystemSource>
+    <UnityDefines>UNITY_2021_3_OR_NEWER;UNITY_2021_2_OR_NEWER;UNITY_2021_1_OR_NEWER;UNITY_2020_3_OR_NEWER;UNITY_2020_2_OR_NEWER;UNITY_2020_1_OR_NEWER;UNITY_2019_4_OR_NEWER;UNITY_2019_3_OR_NEWER;UNITY_2019_2_OR_NEWER;UNITY_2019_1_OR_NEWER;UNITY_ANDROID;ENABLE_INPUT_SYSTEM;ENABLE_LEGACY_INPUT_MANAGER</UnityDefines>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Reference assemblies only: the APIs, no engine. ExcludeAssets keeps NuGet from adding them itself. -->
+    <PackageReference Include="UnityEngine.Modules" Version="2021.3.33" ExcludeAssets="all" GeneratePathProperty="true" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="$(PkgUnityEngine_Modules)/lib/net45/*.dll" Private="false" />
+  </ItemGroup>
+</Project>

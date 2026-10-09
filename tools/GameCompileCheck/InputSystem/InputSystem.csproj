@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The Input System package's runtime, built from its source (check.sh fetches it). -->
+  <PropertyGroup>
+    <AssemblyName>Unity.InputSystem</AssemblyName>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DefineConstants>$(UnityDefines);UNITY_INPUT_SYSTEM_ENABLE_PHYSICS;HAS_SET_LOCAL_POSITION_AND_ROTATION</DefineConstants>
+    <NoWarn>$(NoWarn);CS0618;CS0612;CS0649;CS0414;CS0169;CS0067;CS0672;CS0108;CS0114;CS0162;CS0168;CS0219;CS1998</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Editor code, uGUI and XR support need assemblies we do not have; the game does not use them. -->
+    <Compile Include="$(InputSystemSource)**/*.cs"
+             Exclude="$(InputSystemSource)**/Editor/**;$(InputSystemSource)Plugins/UI/**;$(InputSystemSource)Plugins/XR/**" />
+    <Compile Include="$(InputSystemSource)Plugins/UI/UISupport.cs" />
+    <Compile Include="InputSystemEditorStub.cs" />
+  </ItemGroup>
+</Project>

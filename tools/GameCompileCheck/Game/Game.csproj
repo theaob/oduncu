@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Compiles Assets/Game/Scripts (the Oduncu.Game assembly) against Unity reference assemblies. -->
+  <PropertyGroup>
+    <AssemblyName>Oduncu.Game</AssemblyName>
+    <DefineConstants>$(UnityDefines)</DefineConstants>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../../Oduncu.Unity/Assets/Game/Scripts/**/*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../Oduncu.Sim/Oduncu.Sim.csproj" />
+    <ProjectReference Include="../InputSystem/InputSystem.csproj" />
+  </ItemGroup>
+</Project>
