@@ -14,6 +14,10 @@ namespace Oduncu.Sim
         Attack = 5,
         Stop = 6,
         CancelTrain = 7,
+        SetRally = 8,
+        Repair = 9,
+        SetAutoQueue = 10,
+        SetEconomyTargets = 11,
     }
 
     /// <summary>
@@ -33,7 +37,7 @@ namespace Oduncu.Sim
         public Cell Cell;
         /// <summary>Second cell for commands that span two points (walls, from milestone 1).</summary>
         public Cell Cell2;
-        /// <summary>Small integer argument: queue slot for CancelTrain.</summary>
+        /// <summary>Small integer argument: queue slot for CancelTrain, 0/1 for SetAutoQueue, packed shares for SetEconomyTargets.</summary>
         public int Arg;
 
         public static Command Move(int player, IEnumerable<int> units, Cell to)
@@ -56,6 +60,20 @@ namespace Oduncu.Sim
 
         public static Command CancelTrain(int player, int buildingId, int slot)
             => new Command { Kind = CommandKind.CancelTrain, Player = player, Target = buildingId, Arg = slot };
+
+        /// <summary>Rally a production building's new units to a cell, or onto an entity (a resource to gather) when targetId is not 0.</summary>
+        public static Command SetRally(int player, int buildingId, Cell cell, int targetId = 0)
+            => new Command { Kind = CommandKind.SetRally, Player = player, Target = buildingId, Cell = cell, Arg = targetId };
+
+        /// <summary>Villagers repair a damaged building, or help build one under construction.</summary>
+        public static Command Repair(int player, IEnumerable<int> villagers, int buildingId)
+            => new Command { Kind = CommandKind.Repair, Player = player, Units = Normalize(villagers), Target = buildingId };
+
+        public static Command SetAutoQueue(int player, int buildingId, bool on)
+            => new Command { Kind = CommandKind.SetAutoQueue, Player = player, Target = buildingId, Arg = on ? 1 : 0 };
+
+        public static Command SetEconomyTargets(int player, EconomyTargets targets)
+            => new Command { Kind = CommandKind.SetEconomyTargets, Player = player, Arg = targets.Pack() };
 
         private static int[] Normalize(IEnumerable<int> units)
         {
@@ -125,10 +143,11 @@ namespace Oduncu.Sim
     public sealed class CommandLog
     {
         /// <summary>
-        /// Bumped whenever command kinds or fields change. Version 2 (milestone 1) adds CancelTrain
-        /// and the Cell2 and Arg fields; older logs are rejected rather than misread.
+        /// Bumped whenever command kinds or fields change; older logs are rejected rather than
+        /// misread. Version 2 added CancelTrain and the Cell2 and Arg fields; version 3 adds
+        /// SetRally, Repair, SetAutoQueue and SetEconomyTargets.
         /// </summary>
-        public const int FormatVersion = 2;
+        public const int FormatVersion = 3;
 
         public readonly struct Entry
         {

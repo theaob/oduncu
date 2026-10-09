@@ -20,6 +20,10 @@ namespace Oduncu.Sim
                 case CommandKind.Attack: ApplyAttack(c); break;
                 case CommandKind.Stop: ApplyStop(c); break;
                 case CommandKind.CancelTrain: ApplyCancelTrain(c); break;
+                case CommandKind.SetRally: ApplySetRally(c); break;
+                case CommandKind.Repair: ApplyRepair(c); break;
+                case CommandKind.SetAutoQueue: ApplySetAutoQueue(c); break;
+                case CommandKind.SetEconomyTargets: ApplySetEconomyTargets(c); break;
                 default: Reject("unknown command"); break;
             }
         }
@@ -51,18 +55,12 @@ namespace Oduncu.Sim
         private void ApplyGather(Command c)
         {
             Entity source = Find(c.Target);
-            if (source == null || !source.IsResource) { Reject("gather target is not a resource"); return; }
+            if (!CanGather(source, c.Player)) { Reject("cannot gather that"); return; }
             for (int i = 0; i < c.Units.Length; i++)
             {
                 Entity u = OwnedUnit(c, c.Units[i]);
                 if (u == null || !u.Def.CanGather) continue;
-                u.State = UnitState.Gathering;
-                u.GatherSourceId = source.Id;
-                u.GatherKind = source.Kind;
-                u.PreviousGatherSourceId = 0;
-                u.TargetId = 0;
-                u.HasPath = false;
-                u.WorkTimer = 0;
+                StartGathering(u, source);
             }
         }
 
@@ -110,8 +108,7 @@ namespace Oduncu.Sim
             for (int i = 0; i < b.Def.Trains.Length; i++) if (b.Def.Trains[i] == c.EntityType) allowed = true;
             if (!allowed) { Reject("building cannot train that"); return; }
             if (b.TrainQueue.Count >= SimConstants.TrainQueueLength) { Reject("queue full"); return; }
-            EntityDef def = EntityDefs.Get(c.EntityType);
-            if (CountUnits(c.Player) + QueuedUnits(c.Player) + def.Population > SimConstants.PopulationCap) { Reject("population cap"); return; }
+            // No population check here: a housed queue is held, not rejected (see UpdateBuilding).
             PlayerState player = Players[c.Player];
             Cost cost = player.Stats.Of(c.EntityType).Cost;
             if (!player.CanAfford(cost)) { Reject(player.ShortageMessage(cost)); return; }
@@ -133,11 +130,11 @@ namespace Oduncu.Sim
         private void ApplyAttack(Command c)
         {
             Entity target = Find(c.Target);
-            if (target == null || target.IsResource || target.Owner == c.Player) { Reject("invalid attack target"); return; }
+            if (!IsAttackable(target) || target.Owner == c.Player) { Reject("invalid attack target"); return; }
             for (int i = 0; i < c.Units.Length; i++)
             {
                 Entity u = OwnedUnit(c, c.Units[i]);
-                if (u == null) continue;
+                if (u == null || u.Def.IsAnimal) continue;
                 u.State = UnitState.Attacking;
                 u.TargetId = target.Id;
                 u.HasPath = false;
@@ -156,6 +153,67 @@ namespace Oduncu.Sim
                 u.TargetId = 0;
                 u.PreviousGatherSourceId = 0;
             }
+        }
+    
+        private Entity OwnedBuilding(Command c)
+        {
+            Entity b = Find(c.Target);
+            if (b == null || !b.IsBuilding || b.Owner != c.Player) return null;
+            return b;
+        }
+
+        private void ApplySetRally(Command c)
+        {
+            Entity b = OwnedBuilding(c);
+            if (b == null) { Reject("not your building"); return; }
+            if (b.Def.Trains.Length == 0) { Reject("building trains nothing"); return; }
+            Entity target = c.Arg != 0 ? Find(c.Arg) : null;
+            if (c.Arg != 0 && target == null) { Reject("rally target is gone"); return; }
+            Cell cell = target != null ? target.Cell : c.Cell;
+            if (!Map.InBounds(cell)) { Reject("rally point out of bounds"); return; }
+            b.HasRally = true;
+            b.RallyCell = cell;
+            b.RallyTargetId = target != null ? target.Id : 0;
+        }
+
+        private void ApplyRepair(Command c)
+        {
+            Entity b = OwnedBuilding(c);
+            if (b == null) { Reject("not your building"); return; }
+            if (!b.UnderConstruction && b.Hp >= b.Stats.MaxHp) { Reject("nothing to repair"); return; }
+            for (int i = 0; i < c.Units.Length; i++)
+            {
+                Entity u = OwnedUnit(c, c.Units[i]);
+                if (u == null || !u.Def.CanBuild) continue;
+                if (u.State == UnitState.Gathering || u.State == UnitState.Returning) u.PreviousGatherSourceId = u.GatherSourceId;
+                u.HasPath = false;
+                if (b.UnderConstruction)
+                {
+                    u.State = UnitState.Building;
+                    u.BuildSiteId = b.Id;
+                    u.TargetId = 0;
+                }
+                else
+                {
+                    u.State = UnitState.Repairing;
+                    u.TargetId = b.Id;
+                }
+            }
+        }
+
+        private void ApplySetAutoQueue(Command c)
+        {
+            Entity b = OwnedBuilding(c);
+            if (b == null) { Reject("not your building"); return; }
+            if (System.Array.IndexOf(b.Def.Trains, EntityKind.Villager) < 0) { Reject("building does not train villagers"); return; }
+            b.AutoQueue = c.Arg != 0;
+        }
+
+        private void ApplySetEconomyTargets(Command c)
+        {
+            EconomyTargets targets = EconomyTargets.Unpack(c.Arg);
+            if (!targets.IsValid) { Reject("economy targets must add up to 100"); return; }
+            Players[c.Player].EconomyTargets = targets;
         }
     }
 }

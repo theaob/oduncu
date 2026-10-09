@@ -5,11 +5,13 @@ namespace Oduncu.Sim
         private void UpdateUnit(Entity u)
         {
             if (u.Cooldown > 0) u.Cooldown--;
+            if (u.State != UnitState.Carcass && u.Def.HasTag(EntityTag.Herdable)) UpdateHerdOwnership(u);
 
             switch (u.State)
             {
                 case UnitState.Idle:
                     if (u.Def.IsMilitary) AutoEngage(u);
+                    else if (u.Def.IsAnimal) UpdateIdleAnimal(u);
                     break;
                 case UnitState.Moving:
                     UpdateMoving(u);
@@ -23,8 +25,13 @@ namespace Oduncu.Sim
                 case UnitState.Building:
                     UpdateBuildingWork(u);
                     break;
+                case UnitState.Repairing:
+                    UpdateRepairing(u);
+                    break;
                 case UnitState.Attacking:
                     UpdateAttacking(u);
+                    break;
+                case UnitState.Carcass:
                     break;
             }
         }
@@ -96,126 +103,12 @@ namespace Oduncu.Sim
             u.TargetId = 0;
         }
 
-        // ------------------------------------------------------------------ economy
-
-        /// <summary>Another resource of the kind the villager was gathering, when its source runs out.</summary>
-        private Entity FindNextResource(Entity u)
+        private void MoveTo(Entity u, Cell cell)
         {
-            if (u.GatherKind == EntityKind.None) return null;
-            var filter = new EntityFilter { Kind = u.GatherKind, WithAmount = true };
-            return FindNearest(u.Position, SimConstants.ResourceSearchRadius, ref filter);
-        }
-
-        private Entity FindNearestDropOff(Entity u)
-        {
-            var filter = new EntityFilter
-            {
-                Owner = OwnerMatch.Owned, Player = u.Owner, Complete = true,
-                DropOff = true, DropOffKind = u.CarryKind,
-            };
-            return FindNearest(u.Position, Map.Width + Map.Height, ref filter);
-        }
-
-        private void UpdateGathering(Entity u)
-        {
-            Entity source = Find(u.GatherSourceId);
-            if (source == null || !source.IsResource || source.Amount <= 0)
-            {
-                source = FindNextResource(u);
-                if (source == null)
-                {
-                    if (u.Carry > 0) { u.State = UnitState.Returning; u.HasPath = false; }
-                    else SetIdle(u);
-                    return;
-                }
-                u.GatherSourceId = source.Id;
-                u.HasPath = false;
-            }
-            u.GatherKind = source.Kind;
-
-            if (!IsAdjacent(u, source))
-            {
-                if (!EnsurePathTo(u, source)) { SetIdle(u); return; }
-                StepAlongPath(u);
-                return;
-            }
-
+            u.State = UnitState.Moving;
+            u.MoveTarget = Map.Clamp(cell);
             u.HasPath = false;
-            ResourceKind yields = source.Def.Yields;
-            if (u.CarryKind != yields)
-            {
-                // Switching resource drops whatever was carried, as in AoE2.
-                u.Carry = 0;
-                u.CarryKind = yields;
-            }
-            u.WorkTimer++;
-            if (u.WorkTimer < SimConstants.GatherTicks) return;
-            u.WorkTimer = 0;
-            u.Carry++;
-            source.Amount--;
-            if (source.Amount <= 0) Kill(source);
-            if (u.Carry >= SimConstants.VillagerCarryCapacity)
-            {
-                u.State = UnitState.Returning;
-                u.HasPath = false;
-            }
-        }
-
-        private void UpdateReturning(Entity u)
-        {
-            Entity dropOff = FindNearestDropOff(u);
-            if (dropOff == null) { SetIdle(u); return; }
-            if (!IsAdjacent(u, dropOff))
-            {
-                if (!EnsurePathTo(u, dropOff)) { SetIdle(u); return; }
-                StepAlongPath(u);
-                return;
-            }
-            Players[u.Owner].Add(u.CarryKind, u.Carry);
-            u.Carry = 0;
-            u.State = UnitState.Gathering;
-            u.HasPath = false;
-        }
-
-        private void UpdateBuildingWork(Entity u)
-        {
-            Entity site = Find(u.BuildSiteId);
-            if (site == null || !site.IsBuilding || !site.UnderConstruction)
-            {
-                ResumePreviousJob(u);
-                return;
-            }
-            if (!IsAdjacent(u, site))
-            {
-                if (!EnsurePathTo(u, site)) { SetIdle(u); return; }
-                StepAlongPath(u);
-                return;
-            }
-            u.HasPath = false;
-            site.BuildProgress++;
-            int max = site.Stats.MaxHp;
-            int buildTicks = site.Stats.BuildTicks;
-            site.Hp = 1 + (int)((long)(max - 1) * site.BuildProgress / buildTicks);
-            if (site.BuildProgress >= buildTicks)
-            {
-                site.UnderConstruction = false;
-                site.Hp = max;
-            }
-        }
-
-        private void ResumePreviousJob(Entity u)
-        {
-            u.BuildSiteId = 0;
-            if (u.PreviousGatherSourceId != 0 || u.Carry > 0)
-            {
-                u.GatherSourceId = u.PreviousGatherSourceId;
-                u.PreviousGatherSourceId = 0;
-                u.State = UnitState.Gathering;
-                u.HasPath = false;
-                u.WorkTimer = 0;
-                return;
-            }
-            SetIdle(u);
+            u.TargetId = 0;
         }
 
         // ------------------------------------------------------------------ combat
@@ -223,7 +116,7 @@ namespace Oduncu.Sim
         private void AutoEngage(Entity u)
         {
             if ((CurrentTick + u.Id) % SimConstants.AutoEngageInterval != 0) return;
-            var filter = new EntityFilter { Owner = OwnerMatch.Enemy, Player = u.Owner };
+            var filter = new EntityFilter { Owner = OwnerMatch.Enemy, Player = u.Owner, ExcludeTags = EntityTag.Animal };
             Entity target = FindNearest(u.Position, u.Stats.LineOfSight, ref filter);
             if (target == null) return;
             u.State = UnitState.Attacking;
@@ -231,31 +124,88 @@ namespace Oduncu.Sim
             u.HasPath = false;
         }
 
-        private bool InRange(Entity u, Entity target)
+        private bool InRange(Entity u, Entity target, FP range)
         {
             FP d = FPVector2.Distance(u.Position, NearestPointOf(target, u.Position));
-            return d <= u.Stats.Range;
+            return d <= range;
+        }
+
+        /// <summary>Whether a unit can be hit at all: alive and not already a carcass.</summary>
+        private static bool IsAttackable(Entity target)
+        {
+            return target != null && !target.IsResource && target.State != UnitState.Carcass;
         }
 
         private void UpdateAttacking(Entity u)
         {
             Entity target = Find(u.TargetId);
-            if (target == null || target.IsResource) { SetIdle(u); return; }
+            if (!IsAttackable(target)) { SetIdle(u); return; }
 
-            if (InRange(u, target))
+            if (InRange(u, target, u.Stats.Range))
             {
                 u.HasPath = false;
                 if (u.Cooldown > 0) return;
                 u.Cooldown = u.Stats.AttackTicks;
                 int damage = u.Stats.Attack - target.Stats.MeleeArmor;
                 if (damage < 1) damage = 1;
-                target.Hp -= damage;
-                if (target.Hp <= 0) Kill(target);
+                DealDamage(u, target, damage);
                 return;
             }
 
             if (!EnsurePathTo(u, target)) { SetIdle(u); return; }
             StepAlongPath(u);
+        }
+
+        /// <summary>Apply damage, remember who did it, and kill or (for animals) turn into a carcass.</summary>
+        private void DealDamage(Entity attacker, Entity target, int damage)
+        {
+            target.Hp -= damage;
+            target.LastAttackerId = attacker.Id;
+            if (target.Hp > 0) return;
+            if (target.IsUnit && target.Def.IsAnimal) MakeCarcass(target);
+            else Kill(target);
+        }
+
+        /// <summary>A dead animal stays on the map as neutral food until it is gathered out.</summary>
+        private void MakeCarcass(Entity animal)
+        {
+            animal.Hp = 0;
+            animal.State = UnitState.Carcass;
+            animal.Owner = SimConstants.NeutralOwner;
+            animal.Stats = StatsFor(animal.Owner, animal.Kind);
+            animal.HasPath = false;
+            animal.TargetId = 0;
+        }
+
+        // ------------------------------------------------------------------ animals
+
+        /// <summary>Deer run a short way from any unit that comes close; boar turn on whatever hurt them.</summary>
+        private void UpdateIdleAnimal(Entity a)
+        {
+            if ((CurrentTick + a.Id) % SimConstants.AnimalCheckInterval != 0) return;
+
+            if (a.Def.HasTag(EntityTag.Retaliates))
+            {
+                Entity attacker = Find(a.LastAttackerId);
+                if (IsAttackable(attacker) && FPVector2.SqrDistance(a.Position, attacker.Position) <= FP.FromInt(a.Stats.LineOfSight * a.Stats.LineOfSight))
+                {
+                    a.State = UnitState.Attacking;
+                    a.TargetId = attacker.Id;
+                    a.HasPath = false;
+                }
+                return;
+            }
+
+            if (a.Def.HasTag(EntityTag.Flees))
+            {
+                var filter = new EntityFilter { Category = EntityCategory.Unit, ExcludeTags = EntityTag.Animal };
+                Entity threat = FindNearest(a.Position, SimConstants.FleeTriggerRange, ref filter);
+                if (threat == null) return;
+                FPVector2 away = (a.Position - threat.Position).Normalized;
+                if (away == FPVector2.Zero) away = new FPVector2(FP.One, FP.Zero);
+                FPVector2 to = a.Position + away * FP.FromInt(SimConstants.FleeDistance);
+                MoveTo(a, to.ToCell());
+            }
         }
     }
 }

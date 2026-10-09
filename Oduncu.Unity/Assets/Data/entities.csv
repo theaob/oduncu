@@ -1,10 +1,22 @@
 # Units, buildings and resources. Ids are stored in command logs; never renumber or reuse.
-# Times are in seconds, Speed in tiles per second, Range in tiles. The generator converts to ticks.
-# Tags and Trains are semicolon-separated keys.
-Id,Key,Name,Category,Tags,MinAge,MaxHp,Attack,MeleeArmor,PierceArmor,Range,ReloadSeconds,Speed,LineOfSight,Size,Food,Wood,Gold,Stone,TrainSeconds,BuildSeconds,Population,ResourceAmount,Yields,Trains
-1,Villager,Villager,unit,gatherer;builder,Dark,25,3,0,0,1.6,1.5,0.8,4,1,50,0,0,0,20,0,1,0,,
-2,Militia,Militia,unit,military;infantry,Dark,40,4,1,0,1.6,1.5,0.9,6,1,60,0,20,0,21,0,1,0,,
-3,TownCenter,Town Center,building,dropoff_food;dropoff_wood;dropoff_gold;dropoff_stone,Dark,2400,0,3,5,0,0,0,8,3,0,275,0,100,0,150,0,0,,Villager
-4,Barracks,Barracks,building,,Dark,1200,0,2,2,0,0,0,6,3,0,175,0,0,0,35,0,0,,Militia
-5,Tree,Tree,resource,,Dark,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,100,Wood,
-6,Forge,Forge,building,,Feudal,1500,0,1,1,0,0,0,6,3,0,150,0,0,0,40,0,0,,
+# Times are in seconds, Speed in tiles per second, Range in tiles, GatherRate in resource units
+# per second for one villager. The generator converts to ticks.
+# Housing is population supplied by a finished building. Tags and Trains are semicolon-separated keys.
+Id,Key,Name,Category,Tags,MinAge,MaxHp,Attack,MeleeArmor,PierceArmor,Range,ReloadSeconds,Speed,LineOfSight,Size,Food,Wood,Gold,Stone,TrainSeconds,BuildSeconds,Population,Housing,ResourceAmount,Yields,GatherRate,Trains
+1,Villager,Villager,unit,gatherer;builder,Dark,25,3,0,0,1.6,1.5,0.8,4,1,50,0,0,0,20,0,1,0,0,,0,
+2,Militia,Militia,unit,military;infantry,Dark,40,4,1,0,1.6,1.5,0.9,6,1,60,0,20,0,21,0,1,0,0,,0,
+3,TownCenter,Town Center,building,dropoff_food;dropoff_wood;dropoff_gold;dropoff_stone,Dark,2400,0,3,5,0,0,0,8,3,0,275,0,100,0,150,0,10,0,,0,Villager
+4,Barracks,Barracks,building,,Dark,1200,0,2,2,0,0,0,6,3,0,175,0,0,0,35,0,0,0,,0,Militia
+5,Tree,Tree,resource,,Dark,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,100,Wood,1.25,
+6,Forge,Forge,building,,Feudal,1500,0,1,1,0,0,0,6,3,0,150,0,0,0,40,0,0,0,,0,
+7,House,House,building,,Dark,550,0,0,5,0,0,0,2,2,0,25,0,0,0,25,0,5,0,,0,
+8,Mill,Mill,building,dropoff_food,Dark,1000,0,0,5,0,0,0,6,2,0,100,0,0,0,35,0,0,0,,0,
+9,LumberCamp,Lumber Camp,building,dropoff_wood,Dark,1000,0,0,5,0,0,0,6,2,0,100,0,0,0,35,0,0,0,,0,
+10,MiningCamp,Mining Camp,building,dropoff_gold;dropoff_stone,Dark,1000,0,0,5,0,0,0,6,2,0,100,0,0,0,35,0,0,0,,0,
+11,Farm,Farm,building,,Dark,480,0,0,0,0,0,0,1,2,0,60,0,0,0,15,0,0,175,Food,0.9,
+12,Berries,Berry Bush,resource,,Dark,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,125,Food,1,
+13,GoldMine,Gold Mine,resource,,Dark,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,800,Gold,1.2,
+14,StoneMine,Stone Mine,resource,,Dark,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,350,Stone,1.1,
+15,Sheep,Sheep,unit,animal;herdable,Dark,7,0,0,0,0,0,0.7,2,1,0,0,0,0,0,0,0,0,100,Food,1.1,
+16,Deer,Deer,unit,animal;flees,Dark,5,0,0,0,0,0,1.1,3,1,0,0,0,0,0,0,0,0,140,Food,1.3,
+17,Boar,Wild Boar,unit,animal;retaliates,Dark,40,2,0,0,1.6,2,0.8,6,1,0,0,0,0,0,0,0,0,340,Food,1.3,

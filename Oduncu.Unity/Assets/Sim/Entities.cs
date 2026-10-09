@@ -10,6 +10,9 @@ namespace Oduncu.Sim
         Returning = 3,
         Building = 4,
         Attacking = 5,
+        Repairing = 6,
+        /// <summary>A dead animal left on the map as food. Not a valid attack target.</summary>
+        Carcass = 7,
     }
 
     /// <summary>One slot of a production queue: what is being made and what was paid for it.</summary>
@@ -62,14 +65,27 @@ namespace Oduncu.Sim
         public int BuildSiteId;
         public int Carry;
         public ResourceKind CarryKind = ResourceKind.None;
-        public int WorkTimer;
+        /// <summary>Fraction of the next resource unit gathered so far.</summary>
+        public FP GatherProgress;
         public int Cooldown;
+        /// <summary>Last entity that damaged this one; boar retaliate against it.</summary>
+        public int LastAttackerId;
 
         // Building state
         public bool UnderConstruction;
         public int BuildProgress;
         public readonly List<QueueItem> TrainQueue = new List<QueueItem>(SimConstants.TrainQueueLength);
         public int TrainProgress;
+        /// <summary>Keep one villager queued while on (Town Center auto-villager toggle).</summary>
+        public bool AutoQueue;
+        public bool HasRally;
+        public Cell RallyCell;
+        /// <summary>Entity the rally point is on (a resource to gather, or a building), or 0 for a plain cell.</summary>
+        public int RallyTargetId;
+        /// <summary>Hit points repaired since the building was last at full health; repair is charged from this.</summary>
+        public int RepairedHp;
+        /// <summary>For farms: the villager working it, so the planner sends one farmer per farm.</summary>
+        public int FarmerId;
 
         // Resource state
         public int Amount;
@@ -109,12 +125,19 @@ namespace Oduncu.Sim
             BuildSiteId = 0;
             Carry = 0;
             CarryKind = ResourceKind.None;
-            WorkTimer = 0;
+            GatherProgress = FP.Zero;
             Cooldown = 0;
+            LastAttackerId = 0;
             UnderConstruction = false;
             BuildProgress = 0;
             TrainQueue.Clear();
             TrainProgress = 0;
+            AutoQueue = false;
+            HasRally = false;
+            RallyCell = default;
+            RallyTargetId = 0;
+            RepairedHp = 0;
+            FarmerId = 0;
             Amount = 0;
             IndexBucket = -1;
         }
@@ -138,11 +161,18 @@ namespace Oduncu.Sim
             h.Write(BuildSiteId);
             h.Write(Carry);
             h.Write((int)CarryKind);
-            h.Write(WorkTimer);
+            h.Write(GatherProgress);
             h.Write(Cooldown);
+            h.Write(LastAttackerId);
             h.Write(UnderConstruction);
             h.Write(BuildProgress);
             h.Write(TrainProgress);
+            h.Write(AutoQueue);
+            h.Write(HasRally);
+            h.Write(RallyCell);
+            h.Write(RallyTargetId);
+            h.Write(RepairedHp);
+            h.Write(FarmerId);
             h.Write(Amount);
             h.Write(TrainQueue.Count);
             for (int i = 0; i < TrainQueue.Count; i++)
@@ -169,6 +199,11 @@ namespace Oduncu.Sim
         public int Gold;
         public int Stone;
         public bool Alive = true;
+        /// <summary>Units alive plus units in production, recounted every tick.</summary>
+        public int Population;
+        /// <summary>Housing from finished buildings, capped at SimConstants.MaxPopulation.</summary>
+        public int PopulationCap;
+        public EconomyTargets EconomyTargets = EconomyTargets.Off;
         /// <summary>Stats for every entity kind with this player's researched upgrades applied.</summary>
         public readonly PlayerStats Stats = new PlayerStats();
 
@@ -239,6 +274,9 @@ namespace Oduncu.Sim
             h.Write(Gold);
             h.Write(Stone);
             h.Write(Alive);
+            h.Write(Population);
+            h.Write(PopulationCap);
+            EconomyTargets.WriteState(h);
             Stats.WriteState(h);
         }
     }

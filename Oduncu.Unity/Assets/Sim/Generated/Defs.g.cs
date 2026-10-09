@@ -13,6 +13,17 @@ namespace Oduncu.Sim
         Barracks = 4,
         Tree = 5,
         Forge = 6,
+        House = 7,
+        Mill = 8,
+        LumberCamp = 9,
+        MiningCamp = 10,
+        Farm = 11,
+        Berries = 12,
+        GoldMine = 13,
+        StoneMine = 14,
+        Sheep = 15,
+        Deer = 16,
+        Boar = 17,
     }
 
     [System.Flags]
@@ -31,6 +42,10 @@ namespace Oduncu.Sim
         DropoffWood = 1u << 9,
         DropoffGold = 1u << 10,
         DropoffStone = 1u << 11,
+        Animal = 1u << 12,
+        Herdable = 1u << 13,
+        Flees = 1u << 14,
+        Retaliates = 1u << 15,
     }
 
     public enum AgeId : byte
@@ -52,9 +67,10 @@ namespace Oduncu.Sim
     public static partial class GameData
     {
         public const int GeneratedTicksPerSecond = 10;
-        public const int EntityKindCount = 7;
+        public const int EntityKindCount = 18;
         public const int TechCount = 4;
         public const int AgeCount = 4;
+        public const int EconomyPresetCount = 12;
 
         private static EntityDef[] CreateEntities()
         {
@@ -67,7 +83,8 @@ namespace Oduncu.Sim
                 MaxHp = 25, Attack = 3, MeleeArmor = 0, PierceArmor = 0,
                 Range = FP.Ratio(16, 10), AttackTicks = 15, Speed = FP.Ratio(8, 100), LineOfSight = 4, Size = 1,
                 Cost = new Cost(50, 0, 0, 0),
-                TrainTicks = 200, BuildTicks = 0, Population = 1, ResourceAmount = 0, Yields = ResourceKind.None,
+                TrainTicks = 200, BuildTicks = 0, Population = 1, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
                 Trains = System.Array.Empty<EntityKind>(),
             };
             t[2] = new EntityDef
@@ -77,7 +94,8 @@ namespace Oduncu.Sim
                 MaxHp = 40, Attack = 4, MeleeArmor = 1, PierceArmor = 0,
                 Range = FP.Ratio(16, 10), AttackTicks = 15, Speed = FP.Ratio(9, 100), LineOfSight = 6, Size = 1,
                 Cost = new Cost(60, 0, 20, 0),
-                TrainTicks = 210, BuildTicks = 0, Population = 1, ResourceAmount = 0, Yields = ResourceKind.None,
+                TrainTicks = 210, BuildTicks = 0, Population = 1, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
                 Trains = System.Array.Empty<EntityKind>(),
             };
             t[3] = new EntityDef
@@ -87,7 +105,8 @@ namespace Oduncu.Sim
                 MaxHp = 2400, Attack = 0, MeleeArmor = 3, PierceArmor = 5,
                 Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 8, Size = 3,
                 Cost = new Cost(0, 275, 0, 100),
-                TrainTicks = 0, BuildTicks = 1500, Population = 0, ResourceAmount = 0, Yields = ResourceKind.None,
+                TrainTicks = 0, BuildTicks = 1500, Population = 0, Housing = 10,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
                 Trains = new[] { EntityKind.Villager },
             };
             t[4] = new EntityDef
@@ -97,7 +116,8 @@ namespace Oduncu.Sim
                 MaxHp = 1200, Attack = 0, MeleeArmor = 2, PierceArmor = 2,
                 Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 6, Size = 3,
                 Cost = new Cost(0, 175, 0, 0),
-                TrainTicks = 0, BuildTicks = 350, Population = 0, ResourceAmount = 0, Yields = ResourceKind.None,
+                TrainTicks = 0, BuildTicks = 350, Population = 0, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
                 Trains = new[] { EntityKind.Militia },
             };
             t[5] = new EntityDef
@@ -107,7 +127,8 @@ namespace Oduncu.Sim
                 MaxHp = 0, Attack = 0, MeleeArmor = 0, PierceArmor = 0,
                 Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 0, Size = 1,
                 Cost = new Cost(0, 0, 0, 0),
-                TrainTicks = 0, BuildTicks = 0, Population = 0, ResourceAmount = 100, Yields = ResourceKind.Wood,
+                TrainTicks = 0, BuildTicks = 0, Population = 0, Housing = 0,
+                ResourceAmount = 100, Yields = ResourceKind.Wood, GatherRate = FP.Ratio(125, 1000),
                 Trains = System.Array.Empty<EntityKind>(),
             };
             t[6] = new EntityDef
@@ -117,7 +138,129 @@ namespace Oduncu.Sim
                 MaxHp = 1500, Attack = 0, MeleeArmor = 1, PierceArmor = 1,
                 Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 6, Size = 3,
                 Cost = new Cost(0, 150, 0, 0),
-                TrainTicks = 0, BuildTicks = 400, Population = 0, ResourceAmount = 0, Yields = ResourceKind.None,
+                TrainTicks = 0, BuildTicks = 400, Population = 0, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[7] = new EntityDef
+            {
+                Kind = EntityKind.House, Key = "House", Name = "House", Category = EntityCategory.Building,
+                Tags = EntityTag.None, MinAge = AgeId.Dark,
+                MaxHp = 550, Attack = 0, MeleeArmor = 0, PierceArmor = 5,
+                Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 2, Size = 2,
+                Cost = new Cost(0, 25, 0, 0),
+                TrainTicks = 0, BuildTicks = 250, Population = 0, Housing = 5,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[8] = new EntityDef
+            {
+                Kind = EntityKind.Mill, Key = "Mill", Name = "Mill", Category = EntityCategory.Building,
+                Tags = EntityTag.DropoffFood, MinAge = AgeId.Dark,
+                MaxHp = 1000, Attack = 0, MeleeArmor = 0, PierceArmor = 5,
+                Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 6, Size = 2,
+                Cost = new Cost(0, 100, 0, 0),
+                TrainTicks = 0, BuildTicks = 350, Population = 0, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[9] = new EntityDef
+            {
+                Kind = EntityKind.LumberCamp, Key = "LumberCamp", Name = "Lumber Camp", Category = EntityCategory.Building,
+                Tags = EntityTag.DropoffWood, MinAge = AgeId.Dark,
+                MaxHp = 1000, Attack = 0, MeleeArmor = 0, PierceArmor = 5,
+                Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 6, Size = 2,
+                Cost = new Cost(0, 100, 0, 0),
+                TrainTicks = 0, BuildTicks = 350, Population = 0, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[10] = new EntityDef
+            {
+                Kind = EntityKind.MiningCamp, Key = "MiningCamp", Name = "Mining Camp", Category = EntityCategory.Building,
+                Tags = EntityTag.DropoffGold | EntityTag.DropoffStone, MinAge = AgeId.Dark,
+                MaxHp = 1000, Attack = 0, MeleeArmor = 0, PierceArmor = 5,
+                Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 6, Size = 2,
+                Cost = new Cost(0, 100, 0, 0),
+                TrainTicks = 0, BuildTicks = 350, Population = 0, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[11] = new EntityDef
+            {
+                Kind = EntityKind.Farm, Key = "Farm", Name = "Farm", Category = EntityCategory.Building,
+                Tags = EntityTag.None, MinAge = AgeId.Dark,
+                MaxHp = 480, Attack = 0, MeleeArmor = 0, PierceArmor = 0,
+                Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 1, Size = 2,
+                Cost = new Cost(0, 60, 0, 0),
+                TrainTicks = 0, BuildTicks = 150, Population = 0, Housing = 0,
+                ResourceAmount = 175, Yields = ResourceKind.Food, GatherRate = FP.Ratio(9, 100),
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[12] = new EntityDef
+            {
+                Kind = EntityKind.Berries, Key = "Berries", Name = "Berry Bush", Category = EntityCategory.Resource,
+                Tags = EntityTag.None, MinAge = AgeId.Dark,
+                MaxHp = 0, Attack = 0, MeleeArmor = 0, PierceArmor = 0,
+                Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 0, Size = 1,
+                Cost = new Cost(0, 0, 0, 0),
+                TrainTicks = 0, BuildTicks = 0, Population = 0, Housing = 0,
+                ResourceAmount = 125, Yields = ResourceKind.Food, GatherRate = FP.Ratio(1, 10),
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[13] = new EntityDef
+            {
+                Kind = EntityKind.GoldMine, Key = "GoldMine", Name = "Gold Mine", Category = EntityCategory.Resource,
+                Tags = EntityTag.None, MinAge = AgeId.Dark,
+                MaxHp = 0, Attack = 0, MeleeArmor = 0, PierceArmor = 0,
+                Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 0, Size = 1,
+                Cost = new Cost(0, 0, 0, 0),
+                TrainTicks = 0, BuildTicks = 0, Population = 0, Housing = 0,
+                ResourceAmount = 800, Yields = ResourceKind.Gold, GatherRate = FP.Ratio(12, 100),
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[14] = new EntityDef
+            {
+                Kind = EntityKind.StoneMine, Key = "StoneMine", Name = "Stone Mine", Category = EntityCategory.Resource,
+                Tags = EntityTag.None, MinAge = AgeId.Dark,
+                MaxHp = 0, Attack = 0, MeleeArmor = 0, PierceArmor = 0,
+                Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 0, Size = 1,
+                Cost = new Cost(0, 0, 0, 0),
+                TrainTicks = 0, BuildTicks = 0, Population = 0, Housing = 0,
+                ResourceAmount = 350, Yields = ResourceKind.Stone, GatherRate = FP.Ratio(11, 100),
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[15] = new EntityDef
+            {
+                Kind = EntityKind.Sheep, Key = "Sheep", Name = "Sheep", Category = EntityCategory.Unit,
+                Tags = EntityTag.Animal | EntityTag.Herdable, MinAge = AgeId.Dark,
+                MaxHp = 7, Attack = 0, MeleeArmor = 0, PierceArmor = 0,
+                Range = FP.Zero, AttackTicks = 0, Speed = FP.Ratio(7, 100), LineOfSight = 2, Size = 1,
+                Cost = new Cost(0, 0, 0, 0),
+                TrainTicks = 0, BuildTicks = 0, Population = 0, Housing = 0,
+                ResourceAmount = 100, Yields = ResourceKind.Food, GatherRate = FP.Ratio(11, 100),
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[16] = new EntityDef
+            {
+                Kind = EntityKind.Deer, Key = "Deer", Name = "Deer", Category = EntityCategory.Unit,
+                Tags = EntityTag.Animal | EntityTag.Flees, MinAge = AgeId.Dark,
+                MaxHp = 5, Attack = 0, MeleeArmor = 0, PierceArmor = 0,
+                Range = FP.Zero, AttackTicks = 0, Speed = FP.Ratio(11, 100), LineOfSight = 3, Size = 1,
+                Cost = new Cost(0, 0, 0, 0),
+                TrainTicks = 0, BuildTicks = 0, Population = 0, Housing = 0,
+                ResourceAmount = 140, Yields = ResourceKind.Food, GatherRate = FP.Ratio(13, 100),
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[17] = new EntityDef
+            {
+                Kind = EntityKind.Boar, Key = "Boar", Name = "Wild Boar", Category = EntityCategory.Unit,
+                Tags = EntityTag.Animal | EntityTag.Retaliates, MinAge = AgeId.Dark,
+                MaxHp = 40, Attack = 2, MeleeArmor = 0, PierceArmor = 0,
+                Range = FP.Ratio(16, 10), AttackTicks = 20, Speed = FP.Ratio(8, 100), LineOfSight = 6, Size = 1,
+                Cost = new Cost(0, 0, 0, 0),
+                TrainTicks = 0, BuildTicks = 0, Population = 0, Housing = 0,
+                ResourceAmount = 340, Yields = ResourceKind.Food, GatherRate = FP.Ratio(13, 100),
                 Trains = System.Array.Empty<EntityKind>(),
             };
             return t;
@@ -192,6 +335,25 @@ namespace Oduncu.Sim
                 RequiredBuildings = 2, RequiredBuildingAge = AgeId.Castle, OrBuilding = EntityKind.None,
             };
             return t;
+        }
+
+        private static EconomyPreset[] CreateEconomyPresets()
+        {
+            return new[]
+            {
+                new EconomyPreset("Boom", "Boom", AgeId.Dark, new EconomyTargets(55, 45, 0, 0)),
+                new EconomyPreset("Boom", "Boom", AgeId.Feudal, new EconomyTargets(45, 40, 10, 5)),
+                new EconomyPreset("Boom", "Boom", AgeId.Castle, new EconomyTargets(40, 30, 25, 5)),
+                new EconomyPreset("Boom", "Boom", AgeId.Imperial, new EconomyTargets(35, 30, 30, 5)),
+                new EconomyPreset("Rush", "Rush", AgeId.Dark, new EconomyTargets(50, 40, 10, 0)),
+                new EconomyPreset("Rush", "Rush", AgeId.Feudal, new EconomyTargets(40, 30, 30, 0)),
+                new EconomyPreset("Rush", "Rush", AgeId.Castle, new EconomyTargets(35, 25, 40, 0)),
+                new EconomyPreset("Rush", "Rush", AgeId.Imperial, new EconomyTargets(35, 25, 40, 0)),
+                new EconomyPreset("Siege", "Siege", AgeId.Dark, new EconomyTargets(50, 45, 0, 5)),
+                new EconomyPreset("Siege", "Siege", AgeId.Feudal, new EconomyTargets(40, 35, 15, 10)),
+                new EconomyPreset("Siege", "Siege", AgeId.Castle, new EconomyTargets(35, 25, 30, 10)),
+                new EconomyPreset("Siege", "Siege", AgeId.Imperial, new EconomyTargets(30, 25, 35, 10)),
+            };
         }
     }
 }

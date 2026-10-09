@@ -15,6 +15,8 @@ namespace Oduncu.Sim
         public int TrainTicks;
         public int BuildTicks;
         public Cost Cost;
+        /// <summary>For gatherable kinds: units per tick a villager of this player collects.</summary>
+        public FP GatherRate;
 
         internal void CopyFrom(EntityDef d)
         {
@@ -29,6 +31,7 @@ namespace Oduncu.Sim
             TrainTicks = d.TrainTicks;
             BuildTicks = d.BuildTicks;
             Cost = d.Cost;
+            GatherRate = d.GatherRate;
         }
 
         internal void Apply(StatId stat, EffectOp op, FP value)
@@ -49,6 +52,7 @@ namespace Oduncu.Sim
                 case StatId.CostWood: Cost = new Cost(Cost.Food, Max(0, Combine(Cost.Wood, op, value)), Cost.Gold, Cost.Stone); break;
                 case StatId.CostGold: Cost = new Cost(Cost.Food, Cost.Wood, Max(0, Combine(Cost.Gold, op, value)), Cost.Stone); break;
                 case StatId.CostStone: Cost = new Cost(Cost.Food, Cost.Wood, Cost.Gold, Max(0, Combine(Cost.Stone, op, value))); break;
+                case StatId.GatherRate: GatherRate = FP.Max(FP.Zero, op == EffectOp.Add ? GatherRate + value : GatherRate * value); break;
             }
         }
 

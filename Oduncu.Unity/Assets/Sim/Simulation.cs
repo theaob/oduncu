@@ -64,6 +64,9 @@ namespace Oduncu.Sim
                 for (int i = 0; i < commands.Count; i++) ApplyCommand(commands[i]);
             }
 
+            RecountPopulation();
+            for (int p = 0; p < Players.Length; p++) RunEconomyPlanner(p);
+
             // Iterate by index over a snapshot count: entities spawned this tick are appended
             // and get their first update next tick, which keeps ordering deterministic.
             int count = _entities.Count;
@@ -107,6 +110,7 @@ namespace Oduncu.Sim
             e.Cell = Map.Clamp(at);
             e.Position = FPVector2.CellCentre(e.Cell);
             e.State = UnitState.Idle;
+            e.Amount = def.ResourceAmount;
             Index.Add(e);
             return e;
         }
@@ -182,7 +186,7 @@ namespace Oduncu.Sim
                 for (int i = 0; i < _entities.Count && !alive; i++)
                 {
                     Entity e = _entities[i];
-                    if (e.Owner == p && (e.IsUnit || e.Kind == EntityKind.TownCenter)) alive = true;
+                    if (e.Owner == p && ((e.IsUnit && !e.Def.IsAnimal) || e.Kind == EntityKind.TownCenter)) alive = true;
                 }
                 Players[p].Alive = alive;
             }
@@ -214,13 +218,14 @@ namespace Oduncu.Sim
 
         // ------------------------------------------------------------------ queries
 
+        /// <summary>Living units of a player, not counting animals they herd.</summary>
         public int CountUnits(int owner)
         {
             int n = 0;
             for (int i = 0; i < _entities.Count; i++)
             {
                 Entity e = _entities[i];
-                if (e.Alive && e.Owner == owner && e.IsUnit) n++;
+                if (e.Alive && e.Owner == owner && e.IsUnit && !e.Def.IsAnimal) n++;
             }
             return n;
         }
