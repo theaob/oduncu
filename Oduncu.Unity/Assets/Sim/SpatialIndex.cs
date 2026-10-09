@@ -102,6 +102,8 @@ namespace Oduncu.Sim
         public EntityKind Kind;
         public EntityCategory Category;
         public EntityTag Tags;
+        /// <summary>Skip anything carrying any of these tags.</summary>
+        public EntityTag ExcludeTags;
         public OwnerMatch Owner;
         public int Player;
         /// <summary>Only drop-off buildings that accept DropOffKind.</summary>
@@ -117,6 +119,7 @@ namespace Oduncu.Sim
             if (Kind != EntityKind.None && e.Kind != Kind) return false;
             if (Category != EntityCategory.None && e.Def.Category != Category) return false;
             if ((e.Def.Tags & Tags) != Tags) return false;
+            if ((e.Def.Tags & ExcludeTags) != 0) return false;
             switch (Owner)
             {
                 case OwnerMatch.Owned: if (e.Owner != Player) return false; break;

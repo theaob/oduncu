@@ -101,19 +101,36 @@ namespace Oduncu.Sim.Tests
                 if (def == null || !def.IsUnit) continue;
                 Assert.Greater(def.MaxHp, 0, def.Key);
                 Assert.IsTrue(def.Speed > FP.Zero, def.Key + " has no speed");
-                Assert.Greater(def.Population, 0, def.Key);
+                if (def.IsAnimal) Assert.AreEqual(0, def.Population, def.Key + " is an animal and takes no population");
+                else Assert.Greater(def.Population, 0, def.Key);
             }
         }
 
         [Test]
-        public void ResourcesYieldSomething()
+        public void GatherablesYieldSomethingAtSomeRate()
         {
             foreach (EntityDef def in GameData.Entities)
             {
-                if (def == null || !def.IsResource) continue;
-                Assert.AreNotEqual(ResourceKind.None, def.Yields, def.Key);
+                if (def == null) continue;
+                if (def.IsResource) Assert.IsTrue(def.IsGatherable, def.Key);
+                if (!def.IsGatherable) continue;
                 Assert.Greater(def.ResourceAmount, 0, def.Key);
+                Assert.IsTrue(def.GatherRate > FP.Zero && def.GatherRate <= FP.One, def.Key + " gather rate per tick must be in (0, 1]");
             }
+        }
+
+        [Test]
+        public void EveryResourceHasADropOffAndPresetsAddUpTo100()
+        {
+            for (int r = 0; r < Cost.ResourceCount; r++)
+            {
+                bool found = false;
+                foreach (EntityDef def in GameData.Entities) if (def != null && def.IsBuilding && def.AcceptsDropOff((ResourceKind)r)) found = true;
+                Assert.IsTrue(found, "nothing accepts " + (ResourceKind)r);
+            }
+            foreach (EconomyPreset p in GameData.EconomyPresets) Assert.IsTrue(p.Targets.IsValid && !p.Targets.IsOff, p.Key + " " + p.Age);
+            foreach (string key in new[] { "Boom", "Rush", "Siege" })
+                for (int a = 0; a < GameData.AgeCount; a++) Assert.IsNotNull(GameData.FindPreset(key, (AgeId)a), key + " for " + (AgeId)a);
         }
 
         [Test]

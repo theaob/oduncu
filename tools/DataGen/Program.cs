@@ -137,7 +137,7 @@ namespace Oduncu.Tools.DataGen
         private static readonly string[] Stats =
         {
             "MaxHp", "Attack", "MeleeArmor", "PierceArmor", "Range", "Reload", "Speed", "LineOfSight",
-            "TrainTime", "BuildTime", "CostFood", "CostWood", "CostGold", "CostStone",
+            "TrainTime", "BuildTime", "CostFood", "CostWood", "CostGold", "CostStone", "GatherRate",
         };
 
         private static readonly string[] Resources = { "Food", "Wood", "Gold", "Stone" };
@@ -160,6 +160,7 @@ namespace Oduncu.Tools.DataGen
             var entities = new Table(dataDir, "entities.csv");
             var techs = new Table(dataDir, "techs.csv");
             var effects = new Table(dataDir, "tech_effects.csv");
+            var presets = new Table(dataDir, "economy_presets.csv");
 
             // ---------------------------------------------------------------- keys and ids
             var tagIds = new SortedDictionary<int, string>();
@@ -244,7 +245,8 @@ namespace Oduncu.Tools.DataGen
             sb.Append("        public const int GeneratedTicksPerSecond = ").Append(TicksPerSecond).Append(";\n");
             sb.Append("        public const int EntityKindCount = ").Append(entityById.Keys.Max() + 1).Append(";\n");
             sb.Append("        public const int TechCount = ").Append(techById.Count == 0 ? 1 : techById.Keys.Max() + 1).Append(";\n");
-            sb.Append("        public const int AgeCount = ").Append(ageIds.Count).Append(";\n\n");
+            sb.Append("        public const int AgeCount = ").Append(ageIds.Count).Append(";\n");
+            sb.Append("        public const int EconomyPresetCount = ").Append(presets.Rows.Count).Append(";\n\n");
 
             // Entities
             sb.Append("        private static EntityDef[] CreateEntities()\n        {\n");
@@ -270,7 +272,14 @@ namespace Oduncu.Tools.DataGen
             sb.Append("        private static AgeDef[] CreateAges()\n        {\n");
             sb.Append("            var t = new AgeDef[AgeCount];\n");
             foreach (var kv in ageIds) AppendAge(sb, kv.Value, entityByKey, ageKeys);
-            sb.Append("            return t;\n        }\n");
+            sb.Append("            return t;\n        }\n\n");
+
+            // Economy planner presets
+            sb.Append("        private static EconomyPreset[] CreateEconomyPresets()\n        {\n");
+            sb.Append("            return new[]\n            {\n");
+            var seenPresets = new HashSet<string>();
+            foreach (var r in presets.Rows) AppendPreset(sb, r, ageKeys, seenPresets);
+            sb.Append("            };\n        }\n");
 
             sb.Append("    }\n}\n");
             return sb.ToString();
@@ -295,15 +304,18 @@ namespace Oduncu.Tools.DataGen
 
             string yields = r["Yields"];
             string yieldsCode;
-            if (category == "resource")
+            if (category == "resource" && yields.Length == 0) throw r.Error("resources must have Yields");
+            if (yields.Length != 0)
             {
-                if (!Resources.Contains(yields)) throw r.Error("resources must yield Food, Wood, Gold or Stone");
-                if (Int(r, "ResourceAmount") <= 0) throw r.Error("resources need a ResourceAmount");
+                // Resources, animals (units) and farms (buildings) can all be gathered.
+                if (!Resources.Contains(yields)) throw r.Error("Yields must be Food, Wood, Gold or Stone");
+                if (Int(r, "ResourceAmount") <= 0) throw r.Error("gatherable entities need a ResourceAmount");
+                ParseDecimal(r, "GatherRate", out long rateNum, out long _);
+                if (rateNum <= 0) throw r.Error("gatherable entities need a GatherRate");
                 yieldsCode = "ResourceKind." + yields;
             }
             else
             {
-                if (yields.Length != 0) throw r.Error("only resources have Yields");
                 yieldsCode = "ResourceKind.None";
             }
 
@@ -341,8 +353,10 @@ namespace Oduncu.Tools.DataGen
             sb.Append("                TrainTicks = ").Append(Seconds(r, "TrainSeconds"))
               .Append(", BuildTicks = ").Append(Seconds(r, "BuildSeconds"))
               .Append(", Population = ").Append(Int(r, "Population"))
-              .Append(", ResourceAmount = ").Append(Int(r, "ResourceAmount"))
-              .Append(", Yields = ").Append(yieldsCode).Append(",\n");
+              .Append(", Housing = ").Append(Int(r, "Housing")).Append(",\n");
+            sb.Append("                ResourceAmount = ").Append(Int(r, "ResourceAmount"))
+              .Append(", Yields = ").Append(yieldsCode)
+              .Append(", GatherRate = ").Append(Fp(r, "GatherRate", TicksPerSecond)).Append(",\n");
             sb.Append("                Trains = ");
             if (trains.Count == 0) sb.Append("System.Array.Empty<EntityKind>()");
             else sb.Append("new[] { ").Append(string.Join(", ", trains)).Append(" }");
@@ -403,7 +417,7 @@ namespace Oduncu.Tools.DataGen
             }
             else if (op == "add")
             {
-                if (stat == "Speed") value = Fp(r, "Value", TicksPerSecond);
+                if (stat == "Speed" || stat == "GatherRate") value = Fp(r, "Value", TicksPerSecond);
                 else if (stat == "Reload" || stat == "TrainTime" || stat == "BuildTime") value = "FP.FromInt(" + Seconds(r, "Value") + ")";
                 else value = Fp(r, "Value", 1);
             }
@@ -435,6 +449,19 @@ namespace Oduncu.Tools.DataGen
               .Append(Int(r, "Gold")).Append(", ").Append(Int(r, "Stone")).Append("), ResearchTicks = ").Append(Seconds(r, "ResearchSeconds")).Append(",\n");
             sb.Append("                RequiredBuildings = ").Append(required).Append(", RequiredBuildingAge = AgeId.").Append(reqAge)
               .Append(", OrBuilding = EntityKind.").Append(or.Length == 0 ? "None" : or).Append(",\n            };\n");
+        }
+
+        private static void AppendPreset(StringBuilder sb, Table.Row r, HashSet<string> ageKeys, HashSet<string> seen)
+        {
+            string key = r["Key"];
+            RequireIdentifier(r, key);
+            string age = r["Age"];
+            if (!ageKeys.Contains(age)) throw r.Error("unknown age " + age);
+            if (!seen.Add(key + "/" + age)) throw r.Error("duplicate preset " + key + " for " + age);
+            int f = Int(r, "Food"), w = Int(r, "Wood"), g = Int(r, "Gold"), s = Int(r, "Stone");
+            if (f < 0 || w < 0 || g < 0 || s < 0 || f + w + g + s != 100) throw r.Error("preset shares must be non-negative and add up to 100");
+            sb.Append("                new EconomyPreset(\"").Append(key).Append("\", \"").Append(Escape(r["Name"])).Append("\", AgeId.").Append(age)
+              .Append(", new EconomyTargets(").Append(f).Append(", ").Append(w).Append(", ").Append(g).Append(", ").Append(s).Append(")),\n");
         }
 
         // ---------------------------------------------------------------- value helpers

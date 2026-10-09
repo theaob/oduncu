@@ -95,9 +95,13 @@ namespace Oduncu.Sim
         public int TrainTicks;
         public int BuildTicks;
         public int Population;
+        /// <summary>Population supplied once this building is finished.</summary>
+        public int Housing;
         public int ResourceAmount;
-        /// <summary>What a resource gives when gathered; None for everything else.</summary>
+        /// <summary>What gathering this gives (resources, animals, farms); None for everything else.</summary>
         public ResourceKind Yields = ResourceKind.None;
+        /// <summary>Resource units per tick for one villager, before upgrades.</summary>
+        public FP GatherRate;
         /// <summary>Which kinds this building can train.</summary>
         public EntityKind[] Trains = System.Array.Empty<EntityKind>();
 
@@ -108,6 +112,8 @@ namespace Oduncu.Sim
         public bool CanGather => (Tags & EntityTag.Gatherer) != 0;
         public bool CanBuild => (Tags & EntityTag.Builder) != 0;
         public bool IsDropOff => (Tags & (EntityTag.DropoffFood | EntityTag.DropoffWood | EntityTag.DropoffGold | EntityTag.DropoffStone)) != 0;
+        public bool IsAnimal => (Tags & EntityTag.Animal) != 0;
+        public bool IsGatherable => Yields != ResourceKind.None;
 
         public bool HasTag(EntityTag tag) => (Tags & tag) == tag;
 
@@ -153,6 +159,7 @@ namespace Oduncu.Sim
         CostWood,
         CostGold,
         CostStone,
+        GatherRate,
     }
 
     public enum EffectOp : byte
@@ -207,6 +214,81 @@ namespace Oduncu.Sim
         public EntityKind OrBuilding;
     }
 
+    /// <summary>
+    /// The economy planner's target share of villagers per resource, in percent. All zero means
+    /// the planner is off; otherwise the four shares add up to 100.
+    /// </summary>
+    public readonly struct EconomyTargets
+    {
+        public readonly int Food;
+        public readonly int Wood;
+        public readonly int Gold;
+        public readonly int Stone;
+
+        public EconomyTargets(int food, int wood, int gold, int stone)
+        {
+            Food = food;
+            Wood = wood;
+            Gold = gold;
+            Stone = stone;
+        }
+
+        public static readonly EconomyTargets Off = new EconomyTargets(0, 0, 0, 0);
+
+        public bool IsOff => Food == 0 && Wood == 0 && Gold == 0 && Stone == 0;
+
+        public bool IsValid =>
+            IsOff || (Food >= 0 && Wood >= 0 && Gold >= 0 && Stone >= 0 && Food + Wood + Gold + Stone == 100);
+
+        public int this[ResourceKind kind]
+        {
+            get
+            {
+                switch (kind)
+                {
+                    case ResourceKind.Food: return Food;
+                    case ResourceKind.Wood: return Wood;
+                    case ResourceKind.Gold: return Gold;
+                    case ResourceKind.Stone: return Stone;
+                    default: return 0;
+                }
+            }
+        }
+
+        /// <summary>Four shares of 0..255 packed into one int, for the command Arg field.</summary>
+        public int Pack() => (Food & 0xFF) | (Wood & 0xFF) << 8 | (Gold & 0xFF) << 16 | (Stone & 0xFF) << 24;
+
+        public static EconomyTargets Unpack(int packed) =>
+            new EconomyTargets(packed & 0xFF, (packed >> 8) & 0xFF, (packed >> 16) & 0xFF, (packed >> 24) & 0xFF);
+
+        public void WriteState(StateHasher h)
+        {
+            h.Write(Food);
+            h.Write(Wood);
+            h.Write(Gold);
+            h.Write(Stone);
+        }
+
+        public override string ToString() => Food + "/" + Wood + "/" + Gold + "/" + Stone;
+    }
+
+    /// <summary>A named planner setting for one age ("Boom", "Rush", "Siege").</summary>
+    public sealed class EconomyPreset
+    {
+        public readonly string Key;
+        public readonly string Name;
+        public readonly AgeId Age;
+        public readonly EconomyTargets Targets;
+
+        public EconomyPreset(string key, string name, AgeId age, EconomyTargets targets)
+        {
+            Key = key;
+            Name = name;
+            Age = age;
+            Targets = targets;
+        }
+    }
+
     /// <summary>The generated balance tables. See tools/DataGen and Assets/Data.</summary>
     public static partial class GameData
     {
@@ -214,6 +296,18 @@ namespace Oduncu.Sim
         public static readonly TechDef[] Techs = CreateTechs();
         public static readonly TechEffect[] TechEffects = CreateTechEffects();
         public static readonly AgeDef[] Ages = CreateAges();
+        public static readonly EconomyPreset[] EconomyPresets = CreateEconomyPresets();
+
+        /// <summary>The preset with this key for this age, or null.</summary>
+        public static EconomyPreset FindPreset(string key, AgeId age)
+        {
+            for (int i = 0; i < EconomyPresets.Length; i++)
+            {
+                EconomyPreset p = EconomyPresets[i];
+                if (p.Age == age && p.Key == key) return p;
+            }
+            return null;
+        }
     }
 
     public static class EntityDefs

@@ -152,7 +152,7 @@ namespace Oduncu.Game
             GUI.skin.label.fontSize = 28;
             PlayerState me = sim.Players[player];
             GUI.Label(new Rect(16, 8, 1400, 40), "Food " + me.Food + "   Wood " + me.Wood + "   Gold " + me.Gold + "   Stone " + me.Stone
-                + "   Pop " + sim.CountUnits(player) + "/" + SimConstants.PopulationCap + "   Tick " + sim.CurrentTick);
+                + "   Pop " + me.Population + "/" + me.PopulationCap + "   Tick " + sim.CurrentTick);
             GUI.Label(new Rect(16, 48, 1200, 40), _status + (sim.LastRejection != null ? "   (last rejection: " + sim.LastRejection + ")" : ""));
 
             Entity selected = sim.Find(_selectedId);

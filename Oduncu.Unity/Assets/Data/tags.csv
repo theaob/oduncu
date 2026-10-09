@@ -12,3 +12,7 @@ Id,Key,Meaning
 9,dropoff_wood,Accepts wood
 10,dropoff_gold,Accepts gold
 11,dropoff_stone,Accepts stone
+12,animal,Wild or herdable animal; never counts as population or army
+13,herdable,Owned by whoever's units are nearby (sheep)
+14,flees,Runs from nearby units (deer)
+15,retaliates,Attacks whatever hurt it (boar)
