@@ -38,6 +38,19 @@ jobs:
           name: sim-test-results
           path: Oduncu.Sim.Tests/TestResults/*.trx
 
+  game-compile:
+    name: Game scripts compile (reference assemblies)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Compile Assets/Game against Unity reference assemblies
+        run: tools/GameCompileCheck/check.sh
+
   android-build:
     name: Android build (Unity)
     runs-on: ubuntu-latest

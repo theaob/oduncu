@@ -16,7 +16,8 @@ redesigned for touch and 15-minute matches. Built with Unity 6 and C#.
 | `Oduncu.Unity/Assets/Sim/Generated/` | `Defs.g.cs`, generated from the CSV files. Never edit by hand. |
 | `tools/DataGen/` | The generator that turns the CSV files into `Defs.g.cs`. |
 | `Oduncu.Unity/Assets/Sim.Tests/` | NUnit tests for the simulation. Run in Unity's Test Runner or headless (below). |
-| `Oduncu.Unity/Assets/Game/` | Presentation: tick runner, primitive renderer, touch input, editor bootstrap and build script. |
+| `Oduncu.Unity/Assets/Game/` | Presentation: tick runner with the AI opponent, placeholder art, fog, touch gestures, UI Toolkit HUD, match flow, editor bootstrap and build script. |
+| `tools/GameCompileCheck/` | Compiles `Assets/Game` against Unity reference assemblies, so CI catches game-script compile errors without a Unity licence. |
 | `Oduncu.Sim/`, `Oduncu.Sim.Tests/` | .NET projects that compile the same sources outside Unity for CI, servers and tools. |
 | `.github/workflows/ci.yml` | Runs the headless tests on every push; builds an Android APK when Unity licence secrets are set. |
 
@@ -55,10 +56,14 @@ Ids in the tables are stored in command logs, so never renumber or reuse one.
 ## Opening in Unity
 
 1. Install any Unity 6000.0 LTS editor with the Android Build Support module.
-2. Open `Oduncu.Unity/` from Unity Hub. On first open an editor script creates
-   `Assets/Game/Scenes/Main.unity` and adds it to the build settings.
-3. Press Play. Tap one of your blue villagers, then tap a tree to gather, the ground to
-   move, or use the bottom buttons to build a barracks and train units.
+2. Open `Oduncu.Unity/` from Unity Hub. On first open editor scripts create
+   `Assets/Game/Scenes/Skirmish.unity`, add it to the build settings, set landscape
+   orientation, and turn on both input handlers (the Input System drives the gestures).
+   Unity asks to restart the editor after that last change; say yes.
+3. Press Play, then "Skirmish vs Standard AI". You are blue. In the editor the mouse stands in
+   for one finger and the scroll wheel zooms; Escape pauses. The gestures are the table in
+   design section 7: tap to select or command, double-tap for all of a type on screen,
+   drag to pan, hold then drag to box-select, two fingers to pan and pinch to zoom.
 4. Window > General > Test Runner > EditMode runs the same tests inside Unity.
 
 To build for Android from the command line:
@@ -66,6 +71,17 @@ To build for Android from the command line:
 ```
 <Unity editor> -batchmode -quit -projectPath Oduncu.Unity -executeMethod Oduncu.Game.Editor.BuildScript.BuildAndroid
 ```
+
+## Checking game scripts compile without Unity
+
+```
+tools/GameCompileCheck/check.sh
+```
+
+This builds `Assets/Game/Scripts` and `Assets/Game/Editor` against Unity 2021.3 reference
+assemblies from NuGet and the Input System package's source (cloned at the version in
+`Packages/manifest.json`). It catches typos and wrong signatures; it cannot catch an API that
+exists in 2021.3 but changed in Unity 6, so opening the project in Unity remains the final check.
 
 ## Determinism probe on a device
 
