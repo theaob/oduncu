@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Oduncu.Sim
 {
     public sealed partial class Simulation
@@ -11,6 +13,7 @@ namespace Oduncu.Sim
             {
                 case UnitState.Idle:
                     if (u.Def.IsMilitary) AutoEngage(u);
+                    else if (u.Def.HasTag(EntityTag.Monk)) FindHealTarget(u);
                     else if (u.Def.IsAnimal) UpdateIdleAnimal(u);
                     break;
                 case UnitState.Moving:
@@ -31,7 +34,14 @@ namespace Oduncu.Sim
                 case UnitState.Attacking:
                     UpdateAttacking(u);
                     break;
+                case UnitState.Garrisoning:
+                    UpdateGarrisoning(u);
+                    break;
+                case UnitState.Healing:
+                    UpdateHealing(u);
+                    break;
                 case UnitState.Carcass:
+                case UnitState.Garrisoned:
                     break;
             }
         }
@@ -40,17 +50,49 @@ namespace Oduncu.Sim
 
         private void UpdateMoving(Entity u)
         {
+            FP speed = u.SpeedCap > FP.Zero ? FP.Min(u.Stats.Speed, u.SpeedCap) : u.Stats.Speed;
+            if (u.UsesFlow)
+            {
+                // Large groups share one flow field until close, then each unit paths to its own slot.
+                Cell next;
+                if (Cell.Chebyshev(u.Cell, u.FlowGoal) > SimConstants.FlowHandoffDistance && _flowFields.NextCell(u.FlowGoal, u.Cell, out next))
+                {
+                    StepToward(u, next, speed);
+                    return;
+                }
+                u.UsesFlow = false;
+                u.HasPath = false;
+            }
             if (!u.HasPath)
             {
                 if (!_pathfinder.FindPathToCell(u.Cell, u.MoveTarget, u.Path)) { SetIdle(u); return; }
                 u.HasPath = true;
                 u.PathIndex = 0;
             }
-            if (StepAlongPath(u)) SetIdle(u);
+            if (StepAlongPath(u, speed)) SetIdle(u);
         }
 
+        /// <summary>Move toward a neighbouring cell's centre. Returns true on arrival.</summary>
+        private bool StepToward(Entity u, Cell cell, FP speed)
+        {
+            FPVector2 target = FPVector2.CellCentre(cell);
+            FPVector2 delta = target - u.Position;
+            FP dist = delta.Magnitude;
+            if (dist <= speed)
+            {
+                u.Position = target;
+                SetUnitCell(u, cell);
+                return true;
+            }
+            u.Position = u.Position + delta.Normalized * speed;
+            SetUnitCell(u, u.Position.ToCell());
+            return false;
+        }
+
+        private bool StepAlongPath(Entity u) => StepAlongPath(u, u.Stats.Speed);
+
         /// <summary>Move along the current path. Returns true when the path is finished or lost.</summary>
-        private bool StepAlongPath(Entity u)
+        private bool StepAlongPath(Entity u, FP speed)
         {
             if (!u.HasPath || u.PathIndex >= u.Path.Count) return true;
             Cell next = u.Path[u.PathIndex];
@@ -60,20 +102,9 @@ namespace Oduncu.Sim
                 u.HasPath = false;
                 return false;
             }
-            FPVector2 target = FPVector2.CellCentre(next);
-            FPVector2 delta = target - u.Position;
-            FP dist = delta.Magnitude;
-            FP speed = u.Stats.Speed;
-            if (dist <= speed)
-            {
-                u.Position = target;
-                SetUnitCell(u, next);
-                u.PathIndex++;
-                return u.PathIndex >= u.Path.Count;
-            }
-            u.Position = u.Position + delta.Normalized * speed;
-            SetUnitCell(u, u.Position.ToCell());
-            return false;
+            if (!StepToward(u, next, speed)) return false;
+            u.PathIndex++;
+            return u.PathIndex >= u.Path.Count;
         }
 
         private bool IsAdjacent(Entity u, Entity target)
@@ -101,6 +132,10 @@ namespace Oduncu.Sim
             u.State = UnitState.Idle;
             u.HasPath = false;
             u.TargetId = 0;
+            u.AutoTarget = false;
+            u.ChannelTicks = 0;
+            u.SpeedCap = FP.Zero;
+            u.UsesFlow = false;
         }
 
         private void MoveTo(Entity u, Cell cell)
@@ -109,72 +144,127 @@ namespace Oduncu.Sim
             u.MoveTarget = Map.Clamp(cell);
             u.HasPath = false;
             u.TargetId = 0;
+            u.AutoTarget = false;
+            u.ChannelTicks = 0;
+            u.SpeedCap = FP.Zero;
+            u.UsesFlow = false;
         }
 
-        // ------------------------------------------------------------------ combat
+        // ------------------------------------------------------------------ separation
 
-        private void AutoEngage(Entity u)
+        private static readonly FPVector2[] SeparationDirections =
         {
-            if ((CurrentTick + u.Id) % SimConstants.AutoEngageInterval != 0) return;
-            var filter = new EntityFilter { Owner = OwnerMatch.Enemy, Player = u.Owner, ExcludeTags = EntityTag.Animal };
-            Entity target = FindNearest(u.Position, u.Stats.LineOfSight, ref filter);
-            if (target == null) return;
-            u.State = UnitState.Attacking;
-            u.TargetId = target.Id;
-            u.HasPath = false;
-        }
+            new FPVector2(FP.One, FP.Zero), new FPVector2(FP.Zero, FP.One), new FPVector2(-FP.One, FP.Zero), new FPVector2(FP.Zero, -FP.One),
+            new FPVector2(FP.Ratio(7071, 10000), FP.Ratio(7071, 10000)), new FPVector2(-FP.Ratio(7071, 10000), FP.Ratio(7071, 10000)),
+            new FPVector2(-FP.Ratio(7071, 10000), -FP.Ratio(7071, 10000)), new FPVector2(FP.Ratio(7071, 10000), -FP.Ratio(7071, 10000)),
+        };
 
-        private bool InRange(Entity u, Entity target, FP range)
+        /// <summary>Units at work hold their spot: they push others but are not pushed.</summary>
+        private static bool IsAnchored(Entity u)
         {
-            FP d = FPVector2.Distance(u.Position, NearestPointOf(target, u.Position));
-            return d <= range;
-        }
-
-        /// <summary>Whether a unit can be hit at all: alive and not already a carcass.</summary>
-        private static bool IsAttackable(Entity target)
-        {
-            return target != null && !target.IsResource && target.State != UnitState.Carcass;
-        }
-
-        private void UpdateAttacking(Entity u)
-        {
-            Entity target = Find(u.TargetId);
-            if (!IsAttackable(target)) { SetIdle(u); return; }
-
-            if (InRange(u, target, u.Stats.Range))
+            switch (u.State)
             {
-                u.HasPath = false;
-                if (u.Cooldown > 0) return;
-                u.Cooldown = u.Stats.AttackTicks;
-                int damage = u.Stats.Attack - target.Stats.MeleeArmor;
-                if (damage < 1) damage = 1;
-                DealDamage(u, target, damage);
-                return;
+                case UnitState.Gathering:
+                case UnitState.Building:
+                case UnitState.Repairing:
+                    return true;
+                default:
+                    return false;
             }
-
-            if (!EnsurePathTo(u, target)) { SetIdle(u); return; }
-            StepAlongPath(u);
         }
 
-        /// <summary>Apply damage, remember who did it, and kill or (for animals) turn into a carcass.</summary>
-        private void DealDamage(Entity attacker, Entity target, int damage)
+        /// <summary>
+        /// Soft collision (plan 3.4): each unit, in id order, moves away from units closer than
+        /// SeparationRadius by up to MaxSeparationPush per tick. A push that would end in a
+        /// blocked cell is tried along each axis alone and dropped if both are blocked. Units
+        /// on exactly the same spot split along a direction picked from their ids.
+        /// </summary>
+        private void SeparateUnits()
         {
-            target.Hp -= damage;
-            target.LastAttackerId = attacker.Id;
-            if (target.Hp > 0) return;
-            if (target.IsUnit && target.Def.IsAnimal) MakeCarcass(target);
-            else Kill(target);
+            FP radius = SimConstants.SeparationRadius;
+            FP radius2 = radius * radius;
+            FP maxPush = SimConstants.MaxSeparationPush;
+            for (int i = 0; i < _entities.Count; i++)
+            {
+                Entity u = _entities[i];
+                if (!u.Alive || !u.IsUnit || u.IndexBucket < 0 || u.State == UnitState.Carcass || IsAnchored(u)) continue;
+
+                FPVector2 push = FPVector2.Zero;
+                int bx0 = Index.BucketXOf(u.Cell.X - 1), bx1 = Index.BucketXOf(u.Cell.X + 1);
+                int by0 = Index.BucketYOf(u.Cell.Y - 1), by1 = Index.BucketYOf(u.Cell.Y + 1);
+                for (int by = by0; by <= by1; by++)
+                {
+                    for (int bx = bx0; bx <= bx1; bx++)
+                    {
+                        var bucket = Index.Bucket(bx, by);
+                        for (int k = 0; k < bucket.Count; k++)
+                        {
+                            Entity v = bucket[k];
+                            if (v == u || !v.Alive || !v.IsUnit || v.State == UnitState.Carcass) continue;
+                            FPVector2 diff = u.Position - v.Position;
+                            FP d2 = diff.SqrMagnitude;
+                            if (d2 >= radius2) continue;
+                            if (d2 == FP.Zero)
+                            {
+                                int lo = u.Id < v.Id ? u.Id : v.Id, hi = u.Id < v.Id ? v.Id : u.Id;
+                                FPVector2 dir = SeparationDirections[(lo * 31 + hi) & 7];
+                                push = push + (u.Id == lo ? dir : FPVector2.Zero - dir) * (radius / 2);
+                                continue;
+                            }
+                            FP d = FP.Sqrt(d2);
+                            push = push + diff * ((radius - d) / (d * 2));
+                        }
+                    }
+                }
+                if (push == FPVector2.Zero) continue;
+                if (push.SqrMagnitude > maxPush * maxPush) push = push.Normalized * maxPush;
+
+                FPVector2 to = u.Position + push;
+                if (!Map.IsFree(to.ToCell()))
+                {
+                    to = new FPVector2(u.Position.X + push.X, u.Position.Y);
+                    if (!Map.IsFree(to.ToCell()))
+                    {
+                        to = new FPVector2(u.Position.X, u.Position.Y + push.Y);
+                        if (!Map.IsFree(to.ToCell())) continue;
+                    }
+                }
+                u.Position = to;
+                SetUnitCell(u, to.ToCell());
+            }
         }
 
-        /// <summary>A dead animal stays on the map as neutral food until it is gathered out.</summary>
-        private void MakeCarcass(Entity animal)
+        // ------------------------------------------------------------------ formations
+
+        /// <summary>
+        /// Group move (plan 3.4): units, in id order, take slots on a square grid centred on
+        /// the target, one cell apart, and the group moves at its slowest unit's speed. Groups
+        /// larger than FlowFieldGroupThreshold share a flow field to the target.
+        /// </summary>
+        private void OrderGroupMove(List<Entity> units, Cell target)
         {
-            animal.Hp = 0;
-            animal.State = UnitState.Carcass;
-            animal.Owner = SimConstants.NeutralOwner;
-            animal.Stats = StatsFor(animal.Owner, animal.Kind);
-            animal.HasPath = false;
-            animal.TargetId = 0;
+            int n = units.Count;
+            if (n == 0) return;
+            FP cap = FP.Zero;
+            if (n > 1)
+            {
+                cap = units[0].Stats.Speed;
+                for (int i = 1; i < n; i++) cap = FP.Min(cap, units[i].Stats.Speed);
+            }
+            int cols = (int)FP.IntegerSqrt((ulong)n);
+            if (cols * cols < n) cols++;
+            int rows = (n + cols - 1) / cols;
+            bool flow = n > SimConstants.FlowFieldGroupThreshold;
+            for (int i = 0; i < n; i++)
+            {
+                Entity u = units[i];
+                var slot = new Cell(target.X + i % cols - (cols - 1) / 2, target.Y + i / cols - (rows - 1) / 2);
+                MoveTo(u, slot);
+                u.PreviousGatherSourceId = 0;
+                u.SpeedCap = cap;
+                u.UsesFlow = flow;
+                u.FlowGoal = target;
+            }
         }
 
         // ------------------------------------------------------------------ animals

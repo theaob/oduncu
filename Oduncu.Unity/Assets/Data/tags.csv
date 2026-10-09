@@ -16,3 +16,9 @@ Id,Key,Meaning
 13,herdable,Owned by whoever's units are nearby (sheep)
 14,flees,Runs from nearby units (deer)
 15,retaliates,Attacks whatever hurt it (boar)
+16,building,Added by the generator to every building; bonus damage vs buildings targets it
+17,spear,Spear line
+18,skirmisher,Skirmisher line
+19,targets_buildings,Can only attack buildings (rams and trebuchets)
+20,conquest,A player keeps playing while they own one of these finished (design section 3)
+21,shoots,Building that fires arrows at enemies in range

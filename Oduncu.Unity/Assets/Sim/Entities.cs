@@ -13,6 +13,12 @@ namespace Oduncu.Sim
         Repairing = 6,
         /// <summary>A dead animal left on the map as food. Not a valid attack target.</summary>
         Carcass = 7,
+        /// <summary>Inside a building: off the map, out of the spatial index, safe from attack.</summary>
+        Garrisoned = 8,
+        /// <summary>Walking to a building to garrison in it (TargetId).</summary>
+        Garrisoning = 9,
+        /// <summary>A monk healing a friendly unit (TargetId).</summary>
+        Healing = 10,
     }
 
     /// <summary>One slot of a production queue: what is being made and what was paid for it.</summary>
@@ -70,6 +76,19 @@ namespace Oduncu.Sim
         public int Cooldown;
         /// <summary>Last entity that damaged this one; boar retaliate against it.</summary>
         public int LastAttackerId;
+        /// <summary>Hold-ground stance: only attack what is already in range and never chase.</summary>
+        public bool HoldGround;
+        /// <summary>The current target was picked by auto-engage rather than ordered.</summary>
+        public bool AutoTarget;
+        /// <summary>Building this unit is garrisoned in, or 0.</summary>
+        public int GarrisonedIn;
+        /// <summary>Ticks a monk has spent converting its current target.</summary>
+        public int ChannelTicks;
+        /// <summary>Group move speed limit (the slowest unit's speed), or zero for none.</summary>
+        public FP SpeedCap;
+        /// <summary>Follow the shared flow field toward FlowGoal until close, then A* to MoveTarget.</summary>
+        public bool UsesFlow;
+        public Cell FlowGoal;
 
         // Building state
         public bool UnderConstruction;
@@ -86,6 +105,8 @@ namespace Oduncu.Sim
         public int RepairedHp;
         /// <summary>For farms: the villager working it, so the planner sends one farmer per farm.</summary>
         public int FarmerId;
+        /// <summary>Units inside this building.</summary>
+        public int GarrisonCount;
 
         // Resource state
         public int Amount;
@@ -128,6 +149,14 @@ namespace Oduncu.Sim
             GatherProgress = FP.Zero;
             Cooldown = 0;
             LastAttackerId = 0;
+            HoldGround = false;
+            AutoTarget = false;
+            GarrisonedIn = 0;
+            ChannelTicks = 0;
+            SpeedCap = FP.Zero;
+            UsesFlow = false;
+            FlowGoal = default;
+            GarrisonCount = 0;
             UnderConstruction = false;
             BuildProgress = 0;
             TrainQueue.Clear();
@@ -164,6 +193,14 @@ namespace Oduncu.Sim
             h.Write(GatherProgress);
             h.Write(Cooldown);
             h.Write(LastAttackerId);
+            h.Write(HoldGround);
+            h.Write(AutoTarget);
+            h.Write(GarrisonedIn);
+            h.Write(ChannelTicks);
+            h.Write(SpeedCap);
+            h.Write(UsesFlow);
+            h.Write(FlowGoal);
+            h.Write(GarrisonCount);
             h.Write(UnderConstruction);
             h.Write(BuildProgress);
             h.Write(TrainProgress);
@@ -203,6 +240,8 @@ namespace Oduncu.Sim
         public int Population;
         /// <summary>Housing from finished buildings, capped at SimConstants.MaxPopulation.</summary>
         public int PopulationCap;
+        /// <summary>Set once the player has finished a Town Center, Castle or military production building.</summary>
+        public bool HadConquestBuilding;
         public EconomyTargets EconomyTargets = EconomyTargets.Off;
         /// <summary>Stats for every entity kind with this player's researched upgrades applied.</summary>
         public readonly PlayerStats Stats = new PlayerStats();
@@ -276,6 +315,7 @@ namespace Oduncu.Sim
             h.Write(Alive);
             h.Write(Population);
             h.Write(PopulationCap);
+            h.Write(HadConquestBuilding);
             EconomyTargets.WriteState(h);
             Stats.WriteState(h);
         }

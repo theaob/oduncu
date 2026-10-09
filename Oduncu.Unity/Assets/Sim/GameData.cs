@@ -9,6 +9,25 @@ namespace Oduncu.Sim
         None = 255,
     }
 
+    public enum AttackType : byte
+    {
+        Melee = 0,
+        Pierce = 1,
+    }
+
+    /// <summary>Extra damage an attacker deals to targets carrying a tag (design section 5.3).</summary>
+    public readonly struct BonusDamage
+    {
+        public readonly EntityTag Against;
+        public readonly int Amount;
+
+        public BonusDamage(EntityTag against, int amount)
+        {
+            Against = against;
+            Amount = amount;
+        }
+    }
+
     public enum EntityCategory : byte
     {
         None = 0,
@@ -83,6 +102,19 @@ namespace Oduncu.Sim
         public int Attack;
         public int MeleeArmor;
         public int PierceArmor;
+        public AttackType AttackType;
+        /// <summary>Targets closer than this cannot be attacked (mangonel, trebuchet).</summary>
+        public FP MinRange;
+        /// <summary>Tiles per tick; zero means the hit lands at once (melee).</summary>
+        public FP ProjectileSpeed;
+        /// <summary>Area damage radius around the impact point, friendly fire included; zero for single target.</summary>
+        public FP SplashRadius;
+        public BonusDamage[] Bonuses = System.Array.Empty<BonusDamage>();
+        /// <summary>Base arrows per volley for shooting buildings; each garrisoned unit adds one.</summary>
+        public int Arrows;
+        public int GarrisonCapacity;
+        /// <summary>The next unit in this line; units are replaced by it on age-up.</summary>
+        public EntityKind UpgradesTo;
         /// <summary>Distance from the attacker's centre to the target's nearest point.</summary>
         public FP Range;
         public int AttackTicks;
@@ -114,6 +146,7 @@ namespace Oduncu.Sim
         public bool IsDropOff => (Tags & (EntityTag.DropoffFood | EntityTag.DropoffWood | EntityTag.DropoffGold | EntityTag.DropoffStone)) != 0;
         public bool IsAnimal => (Tags & EntityTag.Animal) != 0;
         public bool IsGatherable => Yields != ResourceKind.None;
+        public bool IsRanged => ProjectileSpeed > FP.Zero;
 
         public bool HasTag(EntityTag tag) => (Tags & tag) == tag;
 

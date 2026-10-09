@@ -24,6 +24,7 @@ namespace Oduncu.Sim
         private readonly Dictionary<int, Entity> _byId = new Dictionary<int, Entity>(1024);
         private readonly Stack<Entity> _pool = new Stack<Entity>(EntityPoolReserve * 2);
         private readonly Pathfinder _pathfinder;
+        private readonly FlowFieldCache _flowFields;
         private readonly StateHasher _hasher = new StateHasher();
         private readonly PlayerStats _neutralStats = new PlayerStats();
         private readonly List<Entity> _scratchUnits = new List<Entity>(64);
@@ -46,6 +47,7 @@ namespace Oduncu.Sim
             }
             Rng = new DeterministicRandom(seed);
             _pathfinder = new Pathfinder(Map);
+            _flowFields = new FlowFieldCache(Map, SimConstants.FlowFieldPoolSize);
         }
 
         public Entity Find(int id)
@@ -78,6 +80,8 @@ namespace Oduncu.Sim
                 else if (e.IsBuilding) UpdateBuilding(e);
             }
 
+            UpdateProjectiles();
+            SeparateUnits();
             RemoveDead();
             UpdatePlayersAlive();
         }
@@ -88,6 +92,10 @@ namespace Oduncu.Sim
             _hasher.Write(CurrentTick);
             _hasher.Write(Rng.State);
             _hasher.Write(_nextId);
+            _hasher.Write(Winner);
+            _hasher.Write(MatchEndTick);
+            _hasher.Write(_projectiles.Count);
+            for (int i = 0; i < _projectiles.Count; i++) _projectiles[i].WriteState(_hasher);
             for (int i = 0; i < Players.Length; i++) Players[i].WriteState(_hasher);
             for (int i = 0; i < _entities.Count; i++) _entities[i].WriteState(_hasher);
             Map.WriteState(_hasher);
@@ -158,6 +166,7 @@ namespace Oduncu.Sim
             e.Alive = false;
             if (e.IsBuilding || e.IsResource) Map.Clear(e.Footprint);
             Index.Remove(e);
+            if (e.IsBuilding) Eject(e);
         }
 
         /// <summary>Compact the entity list in place and return dead entities to the pool.</summary>
@@ -176,20 +185,6 @@ namespace Oduncu.Sim
                 _pool.Push(e);
             }
             if (write < _entities.Count) _entities.RemoveRange(write, _entities.Count - write);
-        }
-
-        private void UpdatePlayersAlive()
-        {
-            for (int p = 0; p < Players.Length; p++)
-            {
-                bool alive = false;
-                for (int i = 0; i < _entities.Count && !alive; i++)
-                {
-                    Entity e = _entities[i];
-                    if (e.Owner == p && ((e.IsUnit && !e.Def.IsAnimal) || e.Kind == EntityKind.TownCenter)) alive = true;
-                }
-                Players[p].Alive = alive;
-            }
         }
 
         // ------------------------------------------------------------------ research
@@ -250,7 +245,10 @@ namespace Oduncu.Sim
         }
 
         /// <summary>A free cell near a footprint for a trained unit to appear on, searching outward rings.</summary>
-        private bool FindSpawnCell(CellRect around, out Cell cell)
+        private bool FindSpawnCell(CellRect around, out Cell cell) => FindSpawnCell(around, 0, out cell);
+
+        /// <summary>The free cell after skipping the first <paramref name="skip"/> ones, so a group spreads out.</summary>
+        private bool FindSpawnCell(CellRect around, int skip, out Cell cell)
         {
             for (int ring = 1; ring <= 4; ring++)
             {
@@ -262,7 +260,10 @@ namespace Oduncu.Sim
                     {
                         bool onRing = x == x0 || x == x1 || y == y0 || y == y1;
                         if (!onRing) continue;
-                        if (Map.IsFree(x, y)) { cell = new Cell(x, y); return true; }
+                        if (!Map.IsFree(x, y)) continue;
+                        if (skip-- > 0) continue;
+                        cell = new Cell(x, y);
+                        return true;
                     }
                 }
             }
