@@ -123,6 +123,10 @@ namespace Oduncu.Sim
         public int FarmerId;
         /// <summary>Units inside this building.</summary>
         public int GarrisonCount;
+        /// <summary>Bit per player who has seen this building or resource; they keep seeing its last position.</summary>
+        public int SeenBy;
+        /// <summary>Attack-move: fight anything met on the way, then carry on to MoveTarget.</summary>
+        public bool AttackMove;
 
         // Resource state
         public int Amount;
@@ -173,6 +177,8 @@ namespace Oduncu.Sim
             UsesFlow = false;
             FlowGoal = default;
             GarrisonCount = 0;
+            SeenBy = 0;
+            AttackMove = false;
             UnderConstruction = false;
             BuildProgress = 0;
             TrainQueue.Clear();
@@ -217,6 +223,8 @@ namespace Oduncu.Sim
             h.Write(UsesFlow);
             h.Write(FlowGoal);
             h.Write(GarrisonCount);
+            h.Write(SeenBy);
+            h.Write(AttackMove);
             h.Write(UnderConstruction);
             h.Write(BuildProgress);
             h.Write(TrainProgress);

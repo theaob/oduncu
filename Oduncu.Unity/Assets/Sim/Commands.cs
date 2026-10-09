@@ -26,6 +26,7 @@ namespace Oduncu.Sim
         MarketBuy = 17,
         MarketSell = 18,
         BuildWall = 19,
+        AttackMove = 20,
     }
 
     public enum Stance : byte
@@ -119,6 +120,10 @@ namespace Oduncu.Sim
         public static Command BuildWall(int player, IEnumerable<int> villagers, EntityKind wall, Cell from, Cell to)
             => new Command { Kind = CommandKind.BuildWall, Player = player, Units = Normalize(villagers), EntityType = wall, Cell = from, Cell2 = to };
 
+        /// <summary>Move, but stop to fight any enemy met on the way, then carry on.</summary>
+        public static Command AttackMove(int player, IEnumerable<int> units, Cell to)
+            => new Command { Kind = CommandKind.AttackMove, Player = player, Units = Normalize(units), Cell = to };
+
         private static int[] Normalize(IEnumerable<int> units)
         {
             if (units == null) return NoUnits;
@@ -191,9 +196,9 @@ namespace Oduncu.Sim
         /// misread. Version 2 added CancelTrain and the Cell2 and Arg fields; version 3 adds
         /// SetRally, Repair, SetAutoQueue and SetEconomyTargets; version 4 adds Garrison,
         /// Ungarrison and SetStance; version 5 adds Research, AgeUp, MarketBuy and MarketSell;
-        /// version 6 adds BuildWall.
+        /// version 6 adds BuildWall; version 7 adds AttackMove.
         /// </summary>
-        public const int FormatVersion = 6;
+        public const int FormatVersion = 7;
 
         public readonly struct Entry
         {

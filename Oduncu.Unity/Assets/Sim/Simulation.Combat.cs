@@ -289,7 +289,7 @@ namespace Oduncu.Sim
         {
             Entity target = Find(u.TargetId);
             // The owner check catches targets converted to our side mid-fight.
-            if (!IsAttackable(target) || target.Owner == u.Owner) { SetIdle(u); return; }
+            if (!IsAttackable(target) || target.Owner == u.Owner) { FinishFight(u); return; }
             if (u.Def.HasTag(EntityTag.Monk)) { UpdateConverting(u, target); return; }
 
             FP d = FPVector2.Distance(u.Position, NearestPointOf(target, u.Position));
@@ -303,8 +303,10 @@ namespace Oduncu.Sim
                 return;
             }
             // Hold ground: never chase something the unit picked for itself.
-            if (u.HoldGround && u.AutoTarget) { SetIdle(u); return; }
-            if (!EnsurePathTo(u, target)) { SetIdle(u); return; }
+            if (u.HoldGround && u.AutoTarget) { FinishFight(u); return; }
+            // Attack-movers chase only within sight, then carry on.
+            if (u.AttackMove && d > FP.FromInt(u.Stats.LineOfSight + 2)) { FinishFight(u); return; }
+            if (!EnsurePathTo(u, target)) { FinishFight(u); return; }
             // Standing next to the target's cell but still out of reach (units are pushed
             // off cell centres): close the last bit in a straight line.
             if (StepAlongPath(u)) StepDirect(u, NearestPointOf(target, u.Position));

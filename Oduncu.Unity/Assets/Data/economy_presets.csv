@@ -1,15 +1,15 @@
 # Economy planner presets (design section 4.3): target share of villagers per resource, by age.
 # Each row must add up to 100.
 Key,Name,Age,Food,Wood,Gold,Stone
-Boom,Boom,Dark,55,45,0,0
-Boom,Boom,Feudal,45,40,10,5
-Boom,Boom,Castle,40,30,25,5
-Boom,Boom,Imperial,35,30,30,5
-Rush,Rush,Dark,50,40,10,0
-Rush,Rush,Feudal,40,30,30,0
+Boom,Boom,Dark,60,40,0,0
+Boom,Boom,Feudal,55,30,15,0
+Boom,Boom,Castle,45,25,30,0
+Boom,Boom,Imperial,40,25,35,0
+Rush,Rush,Dark,55,40,5,0
+Rush,Rush,Feudal,45,25,30,0
 Rush,Rush,Castle,35,25,40,0
 Rush,Rush,Imperial,35,25,40,0
-Siege,Siege,Dark,50,45,0,5
-Siege,Siege,Feudal,40,35,15,10
-Siege,Siege,Castle,35,25,30,10
-Siege,Siege,Imperial,30,25,35,10
+Siege,Siege,Dark,55,45,0,0
+Siege,Siege,Feudal,50,30,20,0
+Siege,Siege,Castle,40,25,35,0
+Siege,Siege,Imperial,35,25,40,0

@@ -48,22 +48,55 @@ namespace Oduncu.Sim
                 }
                 Fog.Reveal(e.Owner, centre, radius);
             }
+
+            // Buildings and resources stay known once seen (no peeking at what was built later in explored ground).
+            for (int i = 0; i < _entities.Count; i++)
+            {
+                Entity e = _entities[i];
+                if (!e.Alive || e.IsUnit) continue;
+                for (int p = 0; p < Players.Length; p++)
+                {
+                    int bit = 1 << p;
+                    if ((e.SeenBy & bit) != 0 || e.Owner == p) continue;
+                    if (AnyCellVisible(p, e.Footprint)) e.SeenBy |= bit;
+                }
+            }
+        }
+
+        private bool AnyCellVisible(int player, CellRect r)
+        {
+            for (int y = r.Y; y <= r.MaxY; y++)
+                for (int x = r.X; x <= r.MaxX; x++)
+                    if (Fog.IsVisible(player, x, y)) return true;
+            return false;
         }
 
         /// <summary>
         /// Whether a player can currently target an entity: their own always; other units while
-        /// visible; buildings and resources once any cell of the footprint has been explored.
+        /// visible; buildings and resources once the player has seen them.
         /// </summary>
         public bool CanSee(int player, Entity e)
         {
             if (e == null) return false;
             if (Reveal == RevealMode.AllVisible || (e.Owner == player && player >= 0)) return true;
             if (e.IsUnit) return Fog.IsVisible(player, e.Cell);
-            CellRect r = e.Footprint;
-            for (int y = r.Y; y <= r.MaxY; y++)
-                for (int x = r.X; x <= r.MaxX; x++)
-                    if (Fog.IsExplored(player, x, y)) return true;
-            return false;
+            return player >= 0 && player < Players.Length && (e.SeenBy & (1 << player)) != 0;
+        }
+
+        /// <summary>
+        /// Whether a Build command for this kind at this origin would be accepted, apart from
+        /// cost: in bounds, free, nobody standing there, age reached, and explored by the player.
+        /// </summary>
+        public bool CanPlace(int player, EntityKind kind, Cell origin)
+        {
+            EntityDef def = EntityDefs.Get(kind);
+            if (!def.IsBuilding || kind == EntityKind.TownCenter || def.MinAge > Players[player].Age) return false;
+            var rect = new CellRect(origin.X, origin.Y, def.Size);
+            if (!Map.IsRectInBounds(rect) || !Map.IsRectFree(rect) || AnyUnitInside(rect)) return false;
+            for (int y = rect.Y; y <= rect.MaxY; y++)
+                for (int x = rect.X; x <= rect.MaxX; x++)
+                    if (!Fog.IsExplored(player, x, y)) return false;
+            return true;
         }
 
         // ------------------------------------------------------------------ walls
