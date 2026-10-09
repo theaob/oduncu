@@ -18,6 +18,16 @@ namespace Oduncu.Sim
         Repair = 9,
         SetAutoQueue = 10,
         SetEconomyTargets = 11,
+        Garrison = 12,
+        Ungarrison = 13,
+        SetStance = 14,
+    }
+
+    public enum Stance : byte
+    {
+        Aggressive = 0,
+        /// <summary>Attack only what is in range and never chase it (design section 5.3).</summary>
+        HoldGround = 1,
     }
 
     /// <summary>
@@ -37,7 +47,7 @@ namespace Oduncu.Sim
         public Cell Cell;
         /// <summary>Second cell for commands that span two points (walls, from milestone 1).</summary>
         public Cell Cell2;
-        /// <summary>Small integer argument: queue slot for CancelTrain, 0/1 for SetAutoQueue, packed shares for SetEconomyTargets.</summary>
+        /// <summary>Small integer argument: queue slot for CancelTrain, 0/1 for SetAutoQueue, packed shares for SetEconomyTargets, the Stance for SetStance.</summary>
         public int Arg;
 
         public static Command Move(int player, IEnumerable<int> units, Cell to)
@@ -74,6 +84,16 @@ namespace Oduncu.Sim
 
         public static Command SetEconomyTargets(int player, EconomyTargets targets)
             => new Command { Kind = CommandKind.SetEconomyTargets, Player = player, Arg = targets.Pack() };
+
+        public static Command Garrison(int player, IEnumerable<int> units, int buildingId)
+            => new Command { Kind = CommandKind.Garrison, Player = player, Units = Normalize(units), Target = buildingId };
+
+        /// <summary>Everyone inside the building comes out onto free cells around it.</summary>
+        public static Command Ungarrison(int player, int buildingId)
+            => new Command { Kind = CommandKind.Ungarrison, Player = player, Target = buildingId };
+
+        public static Command SetStance(int player, IEnumerable<int> units, Stance stance)
+            => new Command { Kind = CommandKind.SetStance, Player = player, Units = Normalize(units), Arg = (int)stance };
 
         private static int[] Normalize(IEnumerable<int> units)
         {
@@ -145,9 +165,10 @@ namespace Oduncu.Sim
         /// <summary>
         /// Bumped whenever command kinds or fields change; older logs are rejected rather than
         /// misread. Version 2 added CancelTrain and the Cell2 and Arg fields; version 3 adds
-        /// SetRally, Repair, SetAutoQueue and SetEconomyTargets.
+        /// SetRally, Repair, SetAutoQueue and SetEconomyTargets; version 4 adds Garrison,
+        /// Ungarrison and SetStance.
         /// </summary>
-        public const int FormatVersion = 3;
+        public const int FormatVersion = 4;
 
         public readonly struct Entry
         {

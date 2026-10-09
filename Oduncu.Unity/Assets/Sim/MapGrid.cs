@@ -2,13 +2,16 @@ namespace Oduncu.Sim
 {
     /// <summary>
     /// Static occupancy of the map. A cell is blocked when a building or resource stands on it.
-    /// Units do not block cells in milestone 0.
+    /// Units never block cells; they push apart instead (soft separation).
     /// </summary>
     public sealed class MapGrid
     {
         public readonly int Width;
         public readonly int Height;
         private readonly int[] _occupant;
+
+        /// <summary>Bumped on every occupancy change so cached flow fields know they are stale.</summary>
+        public int Version { get; private set; }
 
         public MapGrid(int width, int height)
         {
@@ -41,6 +44,7 @@ namespace Oduncu.Sim
 
         public void Occupy(CellRect r, int entityId)
         {
+            Version++;
             for (int y = r.Y; y <= r.MaxY; y++)
                 for (int x = r.X; x <= r.MaxX; x++)
                     _occupant[Index(x, y)] = entityId;
@@ -48,6 +52,7 @@ namespace Oduncu.Sim
 
         public void Clear(CellRect r)
         {
+            Version++;
             for (int y = r.Y; y <= r.MaxY; y++)
                 for (int x = r.X; x <= r.MaxX; x++)
                     _occupant[Index(x, y)] = 0;

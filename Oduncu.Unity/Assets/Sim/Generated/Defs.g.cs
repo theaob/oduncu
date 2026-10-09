@@ -24,6 +24,35 @@ namespace Oduncu.Sim
         Sheep = 15,
         Deer = 16,
         Boar = 17,
+        LongSwordsman = 18,
+        Champion = 19,
+        Spearman = 20,
+        Pikeman = 21,
+        Halberdier = 22,
+        Archer = 23,
+        Crossbowman = 24,
+        Arbalester = 25,
+        Skirmisher = 26,
+        EliteSkirmisher = 27,
+        Scout = 28,
+        LightCavalry = 29,
+        Hussar = 30,
+        Knight = 31,
+        Cavalier = 32,
+        BatteringRam = 33,
+        CappedRam = 34,
+        Mangonel = 35,
+        Onager = 36,
+        Trebuchet = 37,
+        Monk = 38,
+        Longbowman = 39,
+        EliteLongbowman = 40,
+        ArcheryRange = 41,
+        Stable = 42,
+        SiegeWorkshop = 43,
+        Monastery = 44,
+        Castle = 45,
+        Tower = 46,
     }
 
     [System.Flags]
@@ -46,6 +75,12 @@ namespace Oduncu.Sim
         Herdable = 1u << 13,
         Flees = 1u << 14,
         Retaliates = 1u << 15,
+        Building = 1u << 16,
+        Spear = 1u << 17,
+        Skirmisher = 1u << 18,
+        TargetsBuildings = 1u << 19,
+        Conquest = 1u << 20,
+        Shoots = 1u << 21,
     }
 
     public enum AgeId : byte
@@ -67,7 +102,7 @@ namespace Oduncu.Sim
     public static partial class GameData
     {
         public const int GeneratedTicksPerSecond = 10;
-        public const int EntityKindCount = 18;
+        public const int EntityKindCount = 47;
         public const int TechCount = 4;
         public const int AgeCount = 4;
         public const int EconomyPresetCount = 12;
@@ -81,6 +116,9 @@ namespace Oduncu.Sim
                 Kind = EntityKind.Villager, Key = "Villager", Name = "Villager", Category = EntityCategory.Unit,
                 Tags = EntityTag.Gatherer | EntityTag.Builder, MinAge = AgeId.Dark,
                 MaxHp = 25, Attack = 3, MeleeArmor = 0, PierceArmor = 0,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
                 Range = FP.Ratio(16, 10), AttackTicks = 15, Speed = FP.Ratio(8, 100), LineOfSight = 4, Size = 1,
                 Cost = new Cost(50, 0, 0, 0),
                 TrainTicks = 200, BuildTicks = 0, Population = 1, Housing = 0,
@@ -92,7 +130,10 @@ namespace Oduncu.Sim
                 Kind = EntityKind.Militia, Key = "Militia", Name = "Militia", Category = EntityCategory.Unit,
                 Tags = EntityTag.Military | EntityTag.Infantry, MinAge = AgeId.Dark,
                 MaxHp = 40, Attack = 4, MeleeArmor = 1, PierceArmor = 0,
-                Range = FP.Ratio(16, 10), AttackTicks = 15, Speed = FP.Ratio(9, 100), LineOfSight = 6, Size = 1,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = new[] { new BonusDamage(EntityTag.Building, 3) },
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.LongSwordsman,
+                Range = FP.Ratio(16, 10), AttackTicks = 20, Speed = FP.Ratio(9, 100), LineOfSight = 6, Size = 1,
                 Cost = new Cost(60, 0, 20, 0),
                 TrainTicks = 210, BuildTicks = 0, Population = 1, Housing = 0,
                 ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
@@ -101,9 +142,12 @@ namespace Oduncu.Sim
             t[3] = new EntityDef
             {
                 Kind = EntityKind.TownCenter, Key = "TownCenter", Name = "Town Center", Category = EntityCategory.Building,
-                Tags = EntityTag.DropoffFood | EntityTag.DropoffWood | EntityTag.DropoffGold | EntityTag.DropoffStone, MinAge = AgeId.Dark,
-                MaxHp = 2400, Attack = 0, MeleeArmor = 3, PierceArmor = 5,
-                Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 8, Size = 3,
+                Tags = EntityTag.DropoffFood | EntityTag.DropoffWood | EntityTag.DropoffGold | EntityTag.DropoffStone | EntityTag.Conquest | EntityTag.Shoots | EntityTag.Building, MinAge = AgeId.Dark,
+                MaxHp = 2400, Attack = 5, MeleeArmor = 3, PierceArmor = 5,
+                AttackType = AttackType.Pierce, MinRange = FP.Zero, ProjectileSpeed = FP.Ratio(7, 10), SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 1, GarrisonCapacity = 15, UpgradesTo = EntityKind.None,
+                Range = FP.FromInt(6), AttackTicks = 20, Speed = FP.Zero, LineOfSight = 8, Size = 3,
                 Cost = new Cost(0, 275, 0, 100),
                 TrainTicks = 0, BuildTicks = 1500, Population = 0, Housing = 10,
                 ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
@@ -112,19 +156,25 @@ namespace Oduncu.Sim
             t[4] = new EntityDef
             {
                 Kind = EntityKind.Barracks, Key = "Barracks", Name = "Barracks", Category = EntityCategory.Building,
-                Tags = EntityTag.None, MinAge = AgeId.Dark,
+                Tags = EntityTag.Conquest | EntityTag.Building, MinAge = AgeId.Dark,
                 MaxHp = 1200, Attack = 0, MeleeArmor = 2, PierceArmor = 2,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
                 Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 6, Size = 3,
                 Cost = new Cost(0, 175, 0, 0),
                 TrainTicks = 0, BuildTicks = 350, Population = 0, Housing = 0,
                 ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
-                Trains = new[] { EntityKind.Militia },
+                Trains = new[] { EntityKind.Militia, EntityKind.Spearman },
             };
             t[5] = new EntityDef
             {
                 Kind = EntityKind.Tree, Key = "Tree", Name = "Tree", Category = EntityCategory.Resource,
                 Tags = EntityTag.None, MinAge = AgeId.Dark,
                 MaxHp = 0, Attack = 0, MeleeArmor = 0, PierceArmor = 0,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
                 Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 0, Size = 1,
                 Cost = new Cost(0, 0, 0, 0),
                 TrainTicks = 0, BuildTicks = 0, Population = 0, Housing = 0,
@@ -134,8 +184,11 @@ namespace Oduncu.Sim
             t[6] = new EntityDef
             {
                 Kind = EntityKind.Forge, Key = "Forge", Name = "Forge", Category = EntityCategory.Building,
-                Tags = EntityTag.None, MinAge = AgeId.Feudal,
+                Tags = EntityTag.Building, MinAge = AgeId.Feudal,
                 MaxHp = 1500, Attack = 0, MeleeArmor = 1, PierceArmor = 1,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
                 Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 6, Size = 3,
                 Cost = new Cost(0, 150, 0, 0),
                 TrainTicks = 0, BuildTicks = 400, Population = 0, Housing = 0,
@@ -145,8 +198,11 @@ namespace Oduncu.Sim
             t[7] = new EntityDef
             {
                 Kind = EntityKind.House, Key = "House", Name = "House", Category = EntityCategory.Building,
-                Tags = EntityTag.None, MinAge = AgeId.Dark,
+                Tags = EntityTag.Building, MinAge = AgeId.Dark,
                 MaxHp = 550, Attack = 0, MeleeArmor = 0, PierceArmor = 5,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
                 Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 2, Size = 2,
                 Cost = new Cost(0, 25, 0, 0),
                 TrainTicks = 0, BuildTicks = 250, Population = 0, Housing = 5,
@@ -156,8 +212,11 @@ namespace Oduncu.Sim
             t[8] = new EntityDef
             {
                 Kind = EntityKind.Mill, Key = "Mill", Name = "Mill", Category = EntityCategory.Building,
-                Tags = EntityTag.DropoffFood, MinAge = AgeId.Dark,
+                Tags = EntityTag.DropoffFood | EntityTag.Building, MinAge = AgeId.Dark,
                 MaxHp = 1000, Attack = 0, MeleeArmor = 0, PierceArmor = 5,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
                 Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 6, Size = 2,
                 Cost = new Cost(0, 100, 0, 0),
                 TrainTicks = 0, BuildTicks = 350, Population = 0, Housing = 0,
@@ -167,8 +226,11 @@ namespace Oduncu.Sim
             t[9] = new EntityDef
             {
                 Kind = EntityKind.LumberCamp, Key = "LumberCamp", Name = "Lumber Camp", Category = EntityCategory.Building,
-                Tags = EntityTag.DropoffWood, MinAge = AgeId.Dark,
+                Tags = EntityTag.DropoffWood | EntityTag.Building, MinAge = AgeId.Dark,
                 MaxHp = 1000, Attack = 0, MeleeArmor = 0, PierceArmor = 5,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
                 Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 6, Size = 2,
                 Cost = new Cost(0, 100, 0, 0),
                 TrainTicks = 0, BuildTicks = 350, Population = 0, Housing = 0,
@@ -178,8 +240,11 @@ namespace Oduncu.Sim
             t[10] = new EntityDef
             {
                 Kind = EntityKind.MiningCamp, Key = "MiningCamp", Name = "Mining Camp", Category = EntityCategory.Building,
-                Tags = EntityTag.DropoffGold | EntityTag.DropoffStone, MinAge = AgeId.Dark,
+                Tags = EntityTag.DropoffGold | EntityTag.DropoffStone | EntityTag.Building, MinAge = AgeId.Dark,
                 MaxHp = 1000, Attack = 0, MeleeArmor = 0, PierceArmor = 5,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
                 Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 6, Size = 2,
                 Cost = new Cost(0, 100, 0, 0),
                 TrainTicks = 0, BuildTicks = 350, Population = 0, Housing = 0,
@@ -189,8 +254,11 @@ namespace Oduncu.Sim
             t[11] = new EntityDef
             {
                 Kind = EntityKind.Farm, Key = "Farm", Name = "Farm", Category = EntityCategory.Building,
-                Tags = EntityTag.None, MinAge = AgeId.Dark,
+                Tags = EntityTag.Building, MinAge = AgeId.Dark,
                 MaxHp = 480, Attack = 0, MeleeArmor = 0, PierceArmor = 0,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
                 Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 1, Size = 2,
                 Cost = new Cost(0, 60, 0, 0),
                 TrainTicks = 0, BuildTicks = 150, Population = 0, Housing = 0,
@@ -202,6 +270,9 @@ namespace Oduncu.Sim
                 Kind = EntityKind.Berries, Key = "Berries", Name = "Berry Bush", Category = EntityCategory.Resource,
                 Tags = EntityTag.None, MinAge = AgeId.Dark,
                 MaxHp = 0, Attack = 0, MeleeArmor = 0, PierceArmor = 0,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
                 Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 0, Size = 1,
                 Cost = new Cost(0, 0, 0, 0),
                 TrainTicks = 0, BuildTicks = 0, Population = 0, Housing = 0,
@@ -213,6 +284,9 @@ namespace Oduncu.Sim
                 Kind = EntityKind.GoldMine, Key = "GoldMine", Name = "Gold Mine", Category = EntityCategory.Resource,
                 Tags = EntityTag.None, MinAge = AgeId.Dark,
                 MaxHp = 0, Attack = 0, MeleeArmor = 0, PierceArmor = 0,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
                 Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 0, Size = 1,
                 Cost = new Cost(0, 0, 0, 0),
                 TrainTicks = 0, BuildTicks = 0, Population = 0, Housing = 0,
@@ -224,6 +298,9 @@ namespace Oduncu.Sim
                 Kind = EntityKind.StoneMine, Key = "StoneMine", Name = "Stone Mine", Category = EntityCategory.Resource,
                 Tags = EntityTag.None, MinAge = AgeId.Dark,
                 MaxHp = 0, Attack = 0, MeleeArmor = 0, PierceArmor = 0,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
                 Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 0, Size = 1,
                 Cost = new Cost(0, 0, 0, 0),
                 TrainTicks = 0, BuildTicks = 0, Population = 0, Housing = 0,
@@ -235,6 +312,9 @@ namespace Oduncu.Sim
                 Kind = EntityKind.Sheep, Key = "Sheep", Name = "Sheep", Category = EntityCategory.Unit,
                 Tags = EntityTag.Animal | EntityTag.Herdable, MinAge = AgeId.Dark,
                 MaxHp = 7, Attack = 0, MeleeArmor = 0, PierceArmor = 0,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
                 Range = FP.Zero, AttackTicks = 0, Speed = FP.Ratio(7, 100), LineOfSight = 2, Size = 1,
                 Cost = new Cost(0, 0, 0, 0),
                 TrainTicks = 0, BuildTicks = 0, Population = 0, Housing = 0,
@@ -246,6 +326,9 @@ namespace Oduncu.Sim
                 Kind = EntityKind.Deer, Key = "Deer", Name = "Deer", Category = EntityCategory.Unit,
                 Tags = EntityTag.Animal | EntityTag.Flees, MinAge = AgeId.Dark,
                 MaxHp = 5, Attack = 0, MeleeArmor = 0, PierceArmor = 0,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
                 Range = FP.Zero, AttackTicks = 0, Speed = FP.Ratio(11, 100), LineOfSight = 3, Size = 1,
                 Cost = new Cost(0, 0, 0, 0),
                 TrainTicks = 0, BuildTicks = 0, Population = 0, Housing = 0,
@@ -257,10 +340,419 @@ namespace Oduncu.Sim
                 Kind = EntityKind.Boar, Key = "Boar", Name = "Wild Boar", Category = EntityCategory.Unit,
                 Tags = EntityTag.Animal | EntityTag.Retaliates, MinAge = AgeId.Dark,
                 MaxHp = 40, Attack = 2, MeleeArmor = 0, PierceArmor = 0,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
                 Range = FP.Ratio(16, 10), AttackTicks = 20, Speed = FP.Ratio(8, 100), LineOfSight = 6, Size = 1,
                 Cost = new Cost(0, 0, 0, 0),
                 TrainTicks = 0, BuildTicks = 0, Population = 0, Housing = 0,
                 ResourceAmount = 340, Yields = ResourceKind.Food, GatherRate = FP.Ratio(13, 100),
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[18] = new EntityDef
+            {
+                Kind = EntityKind.LongSwordsman, Key = "LongSwordsman", Name = "Long Swordsman", Category = EntityCategory.Unit,
+                Tags = EntityTag.Military | EntityTag.Infantry, MinAge = AgeId.Castle,
+                MaxHp = 60, Attack = 9, MeleeArmor = 1, PierceArmor = 1,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = new[] { new BonusDamage(EntityTag.Building, 4) },
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.Champion,
+                Range = FP.Ratio(16, 10), AttackTicks = 20, Speed = FP.Ratio(9, 100), LineOfSight = 6, Size = 1,
+                Cost = new Cost(60, 0, 20, 0),
+                TrainTicks = 210, BuildTicks = 0, Population = 1, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[19] = new EntityDef
+            {
+                Kind = EntityKind.Champion, Key = "Champion", Name = "Champion", Category = EntityCategory.Unit,
+                Tags = EntityTag.Military | EntityTag.Infantry, MinAge = AgeId.Imperial,
+                MaxHp = 70, Attack = 13, MeleeArmor = 2, PierceArmor = 1,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = new[] { new BonusDamage(EntityTag.Building, 5) },
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
+                Range = FP.Ratio(16, 10), AttackTicks = 20, Speed = FP.Ratio(9, 100), LineOfSight = 6, Size = 1,
+                Cost = new Cost(60, 0, 20, 0),
+                TrainTicks = 210, BuildTicks = 0, Population = 1, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[20] = new EntityDef
+            {
+                Kind = EntityKind.Spearman, Key = "Spearman", Name = "Spearman", Category = EntityCategory.Unit,
+                Tags = EntityTag.Military | EntityTag.Infantry | EntityTag.Spear, MinAge = AgeId.Feudal,
+                MaxHp = 45, Attack = 3, MeleeArmor = 0, PierceArmor = 0,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = new[] { new BonusDamage(EntityTag.Cavalry, 15) },
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.Pikeman,
+                Range = FP.Ratio(16, 10), AttackTicks = 15, Speed = FP.Ratio(10, 100), LineOfSight = 6, Size = 1,
+                Cost = new Cost(35, 25, 0, 0),
+                TrainTicks = 220, BuildTicks = 0, Population = 1, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[21] = new EntityDef
+            {
+                Kind = EntityKind.Pikeman, Key = "Pikeman", Name = "Pikeman", Category = EntityCategory.Unit,
+                Tags = EntityTag.Military | EntityTag.Infantry | EntityTag.Spear, MinAge = AgeId.Castle,
+                MaxHp = 55, Attack = 4, MeleeArmor = 0, PierceArmor = 0,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = new[] { new BonusDamage(EntityTag.Cavalry, 22) },
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.Halberdier,
+                Range = FP.Ratio(16, 10), AttackTicks = 15, Speed = FP.Ratio(10, 100), LineOfSight = 6, Size = 1,
+                Cost = new Cost(35, 25, 0, 0),
+                TrainTicks = 220, BuildTicks = 0, Population = 1, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[22] = new EntityDef
+            {
+                Kind = EntityKind.Halberdier, Key = "Halberdier", Name = "Halberdier", Category = EntityCategory.Unit,
+                Tags = EntityTag.Military | EntityTag.Infantry | EntityTag.Spear, MinAge = AgeId.Imperial,
+                MaxHp = 60, Attack = 6, MeleeArmor = 0, PierceArmor = 0,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = new[] { new BonusDamage(EntityTag.Cavalry, 32) },
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
+                Range = FP.Ratio(16, 10), AttackTicks = 15, Speed = FP.Ratio(10, 100), LineOfSight = 6, Size = 1,
+                Cost = new Cost(35, 25, 0, 0),
+                TrainTicks = 220, BuildTicks = 0, Population = 1, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[23] = new EntityDef
+            {
+                Kind = EntityKind.Archer, Key = "Archer", Name = "Archer", Category = EntityCategory.Unit,
+                Tags = EntityTag.Military | EntityTag.Archer, MinAge = AgeId.Feudal,
+                MaxHp = 30, Attack = 4, MeleeArmor = 0, PierceArmor = 0,
+                AttackType = AttackType.Pierce, MinRange = FP.Zero, ProjectileSpeed = FP.Ratio(7, 10), SplashRadius = FP.Zero,
+                Bonuses = new[] { new BonusDamage(EntityTag.Spear, 2), new BonusDamage(EntityTag.Infantry, 1) },
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.Crossbowman,
+                Range = FP.FromInt(4), AttackTicks = 20, Speed = FP.Ratio(96, 1000), LineOfSight = 6, Size = 1,
+                Cost = new Cost(0, 25, 45, 0),
+                TrainTicks = 350, BuildTicks = 0, Population = 1, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[24] = new EntityDef
+            {
+                Kind = EntityKind.Crossbowman, Key = "Crossbowman", Name = "Crossbowman", Category = EntityCategory.Unit,
+                Tags = EntityTag.Military | EntityTag.Archer, MinAge = AgeId.Castle,
+                MaxHp = 35, Attack = 5, MeleeArmor = 0, PierceArmor = 0,
+                AttackType = AttackType.Pierce, MinRange = FP.Zero, ProjectileSpeed = FP.Ratio(7, 10), SplashRadius = FP.Zero,
+                Bonuses = new[] { new BonusDamage(EntityTag.Spear, 3), new BonusDamage(EntityTag.Infantry, 6) },
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.Arbalester,
+                Range = FP.FromInt(5), AttackTicks = 20, Speed = FP.Ratio(96, 1000), LineOfSight = 7, Size = 1,
+                Cost = new Cost(0, 25, 45, 0),
+                TrainTicks = 270, BuildTicks = 0, Population = 1, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[25] = new EntityDef
+            {
+                Kind = EntityKind.Arbalester, Key = "Arbalester", Name = "Arbalester", Category = EntityCategory.Unit,
+                Tags = EntityTag.Military | EntityTag.Archer, MinAge = AgeId.Imperial,
+                MaxHp = 40, Attack = 6, MeleeArmor = 0, PierceArmor = 0,
+                AttackType = AttackType.Pierce, MinRange = FP.Zero, ProjectileSpeed = FP.Ratio(7, 10), SplashRadius = FP.Zero,
+                Bonuses = new[] { new BonusDamage(EntityTag.Spear, 3), new BonusDamage(EntityTag.Infantry, 7) },
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
+                Range = FP.FromInt(5), AttackTicks = 20, Speed = FP.Ratio(96, 1000), LineOfSight = 7, Size = 1,
+                Cost = new Cost(0, 25, 45, 0),
+                TrainTicks = 270, BuildTicks = 0, Population = 1, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[26] = new EntityDef
+            {
+                Kind = EntityKind.Skirmisher, Key = "Skirmisher", Name = "Skirmisher", Category = EntityCategory.Unit,
+                Tags = EntityTag.Military | EntityTag.Archer | EntityTag.Skirmisher, MinAge = AgeId.Feudal,
+                MaxHp = 30, Attack = 2, MeleeArmor = 0, PierceArmor = 3,
+                AttackType = AttackType.Pierce, MinRange = FP.Zero, ProjectileSpeed = FP.Ratio(7, 10), SplashRadius = FP.Zero,
+                Bonuses = new[] { new BonusDamage(EntityTag.Archer, 4), new BonusDamage(EntityTag.Spear, 3) },
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.EliteSkirmisher,
+                Range = FP.FromInt(4), AttackTicks = 30, Speed = FP.Ratio(96, 1000), LineOfSight = 6, Size = 1,
+                Cost = new Cost(25, 35, 0, 0),
+                TrainTicks = 220, BuildTicks = 0, Population = 1, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[27] = new EntityDef
+            {
+                Kind = EntityKind.EliteSkirmisher, Key = "EliteSkirmisher", Name = "Elite Skirmisher", Category = EntityCategory.Unit,
+                Tags = EntityTag.Military | EntityTag.Archer | EntityTag.Skirmisher, MinAge = AgeId.Castle,
+                MaxHp = 35, Attack = 3, MeleeArmor = 0, PierceArmor = 4,
+                AttackType = AttackType.Pierce, MinRange = FP.Zero, ProjectileSpeed = FP.Ratio(7, 10), SplashRadius = FP.Zero,
+                Bonuses = new[] { new BonusDamage(EntityTag.Archer, 5), new BonusDamage(EntityTag.Spear, 3) },
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
+                Range = FP.FromInt(5), AttackTicks = 30, Speed = FP.Ratio(96, 1000), LineOfSight = 7, Size = 1,
+                Cost = new Cost(25, 35, 0, 0),
+                TrainTicks = 220, BuildTicks = 0, Population = 1, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[28] = new EntityDef
+            {
+                Kind = EntityKind.Scout, Key = "Scout", Name = "Scout Cavalry", Category = EntityCategory.Unit,
+                Tags = EntityTag.Military | EntityTag.Cavalry, MinAge = AgeId.Feudal,
+                MaxHp = 45, Attack = 3, MeleeArmor = 0, PierceArmor = 2,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = new[] { new BonusDamage(EntityTag.Monk, 8), new BonusDamage(EntityTag.Siege, 8) },
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.LightCavalry,
+                Range = FP.Ratio(16, 10), AttackTicks = 20, Speed = FP.Ratio(155, 1000), LineOfSight = 8, Size = 1,
+                Cost = new Cost(80, 0, 0, 0),
+                TrainTicks = 300, BuildTicks = 0, Population = 1, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[29] = new EntityDef
+            {
+                Kind = EntityKind.LightCavalry, Key = "LightCavalry", Name = "Light Cavalry", Category = EntityCategory.Unit,
+                Tags = EntityTag.Military | EntityTag.Cavalry, MinAge = AgeId.Castle,
+                MaxHp = 60, Attack = 7, MeleeArmor = 0, PierceArmor = 2,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = new[] { new BonusDamage(EntityTag.Monk, 10), new BonusDamage(EntityTag.Siege, 12) },
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.Hussar,
+                Range = FP.Ratio(16, 10), AttackTicks = 20, Speed = FP.Ratio(15, 100), LineOfSight = 8, Size = 1,
+                Cost = new Cost(80, 0, 0, 0),
+                TrainTicks = 300, BuildTicks = 0, Population = 1, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[30] = new EntityDef
+            {
+                Kind = EntityKind.Hussar, Key = "Hussar", Name = "Hussar", Category = EntityCategory.Unit,
+                Tags = EntityTag.Military | EntityTag.Cavalry, MinAge = AgeId.Imperial,
+                MaxHp = 75, Attack = 7, MeleeArmor = 0, PierceArmor = 2,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = new[] { new BonusDamage(EntityTag.Monk, 12), new BonusDamage(EntityTag.Siege, 14) },
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
+                Range = FP.Ratio(16, 10), AttackTicks = 19, Speed = FP.Ratio(15, 100), LineOfSight = 9, Size = 1,
+                Cost = new Cost(80, 0, 0, 0),
+                TrainTicks = 300, BuildTicks = 0, Population = 1, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[31] = new EntityDef
+            {
+                Kind = EntityKind.Knight, Key = "Knight", Name = "Knight", Category = EntityCategory.Unit,
+                Tags = EntityTag.Military | EntityTag.Cavalry, MinAge = AgeId.Castle,
+                MaxHp = 100, Attack = 10, MeleeArmor = 2, PierceArmor = 2,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = new[] { new BonusDamage(EntityTag.Archer, 4) },
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.Cavalier,
+                Range = FP.Ratio(16, 10), AttackTicks = 18, Speed = FP.Ratio(135, 1000), LineOfSight = 5, Size = 1,
+                Cost = new Cost(60, 0, 75, 0),
+                TrainTicks = 300, BuildTicks = 0, Population = 1, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[32] = new EntityDef
+            {
+                Kind = EntityKind.Cavalier, Key = "Cavalier", Name = "Cavalier", Category = EntityCategory.Unit,
+                Tags = EntityTag.Military | EntityTag.Cavalry, MinAge = AgeId.Imperial,
+                MaxHp = 120, Attack = 12, MeleeArmor = 2, PierceArmor = 2,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = new[] { new BonusDamage(EntityTag.Archer, 5) },
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
+                Range = FP.Ratio(16, 10), AttackTicks = 18, Speed = FP.Ratio(135, 1000), LineOfSight = 5, Size = 1,
+                Cost = new Cost(60, 0, 75, 0),
+                TrainTicks = 300, BuildTicks = 0, Population = 1, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[33] = new EntityDef
+            {
+                Kind = EntityKind.BatteringRam, Key = "BatteringRam", Name = "Battering Ram", Category = EntityCategory.Unit,
+                Tags = EntityTag.Military | EntityTag.Siege | EntityTag.TargetsBuildings, MinAge = AgeId.Castle,
+                MaxHp = 175, Attack = 2, MeleeArmor = 0, PierceArmor = 180,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = new[] { new BonusDamage(EntityTag.Building, 125) },
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.CappedRam,
+                Range = FP.Ratio(16, 10), AttackTicks = 50, Speed = FP.Ratio(5, 100), LineOfSight = 3, Size = 1,
+                Cost = new Cost(0, 160, 75, 0),
+                TrainTicks = 360, BuildTicks = 0, Population = 1, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[34] = new EntityDef
+            {
+                Kind = EntityKind.CappedRam, Key = "CappedRam", Name = "Capped Ram", Category = EntityCategory.Unit,
+                Tags = EntityTag.Military | EntityTag.Siege | EntityTag.TargetsBuildings, MinAge = AgeId.Imperial,
+                MaxHp = 200, Attack = 3, MeleeArmor = 0, PierceArmor = 190,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = new[] { new BonusDamage(EntityTag.Building, 150) },
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
+                Range = FP.Ratio(16, 10), AttackTicks = 50, Speed = FP.Ratio(5, 100), LineOfSight = 3, Size = 1,
+                Cost = new Cost(0, 160, 75, 0),
+                TrainTicks = 360, BuildTicks = 0, Population = 1, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[35] = new EntityDef
+            {
+                Kind = EntityKind.Mangonel, Key = "Mangonel", Name = "Mangonel", Category = EntityCategory.Unit,
+                Tags = EntityTag.Military | EntityTag.Siege, MinAge = AgeId.Castle,
+                MaxHp = 50, Attack = 40, MeleeArmor = 0, PierceArmor = 6,
+                AttackType = AttackType.Melee, MinRange = FP.FromInt(3), ProjectileSpeed = FP.Ratio(5, 10), SplashRadius = FP.FromInt(1),
+                Bonuses = new[] { new BonusDamage(EntityTag.Building, 20) },
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.Onager,
+                Range = FP.FromInt(7), AttackTicks = 60, Speed = FP.Ratio(6, 100), LineOfSight = 9, Size = 1,
+                Cost = new Cost(0, 160, 135, 0),
+                TrainTicks = 460, BuildTicks = 0, Population = 1, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[36] = new EntityDef
+            {
+                Kind = EntityKind.Onager, Key = "Onager", Name = "Onager", Category = EntityCategory.Unit,
+                Tags = EntityTag.Military | EntityTag.Siege, MinAge = AgeId.Imperial,
+                MaxHp = 60, Attack = 50, MeleeArmor = 0, PierceArmor = 7,
+                AttackType = AttackType.Melee, MinRange = FP.FromInt(3), ProjectileSpeed = FP.Ratio(5, 10), SplashRadius = FP.FromInt(1),
+                Bonuses = new[] { new BonusDamage(EntityTag.Building, 30) },
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
+                Range = FP.FromInt(8), AttackTicks = 60, Speed = FP.Ratio(6, 100), LineOfSight = 10, Size = 1,
+                Cost = new Cost(0, 160, 135, 0),
+                TrainTicks = 460, BuildTicks = 0, Population = 1, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[37] = new EntityDef
+            {
+                Kind = EntityKind.Trebuchet, Key = "Trebuchet", Name = "Trebuchet", Category = EntityCategory.Unit,
+                Tags = EntityTag.Military | EntityTag.Siege | EntityTag.TargetsBuildings, MinAge = AgeId.Imperial,
+                MaxHp = 150, Attack = 200, MeleeArmor = 2, PierceArmor = 150,
+                AttackType = AttackType.Melee, MinRange = FP.FromInt(4), ProjectileSpeed = FP.Ratio(5, 10), SplashRadius = FP.Zero,
+                Bonuses = new[] { new BonusDamage(EntityTag.Building, 250) },
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
+                Range = FP.FromInt(16), AttackTicks = 100, Speed = FP.Ratio(8, 100), LineOfSight = 19, Size = 1,
+                Cost = new Cost(0, 200, 200, 0),
+                TrainTicks = 500, BuildTicks = 0, Population = 1, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[38] = new EntityDef
+            {
+                Kind = EntityKind.Monk, Key = "Monk", Name = "Monk", Category = EntityCategory.Unit,
+                Tags = EntityTag.Monk, MinAge = AgeId.Castle,
+                MaxHp = 30, Attack = 0, MeleeArmor = 0, PierceArmor = 0,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
+                Range = FP.FromInt(9), AttackTicks = 10, Speed = FP.Ratio(7, 100), LineOfSight = 11, Size = 1,
+                Cost = new Cost(0, 0, 100, 0),
+                TrainTicks = 510, BuildTicks = 0, Population = 1, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[39] = new EntityDef
+            {
+                Kind = EntityKind.Longbowman, Key = "Longbowman", Name = "Longbowman", Category = EntityCategory.Unit,
+                Tags = EntityTag.Military | EntityTag.Archer, MinAge = AgeId.Castle,
+                MaxHp = 35, Attack = 6, MeleeArmor = 0, PierceArmor = 0,
+                AttackType = AttackType.Pierce, MinRange = FP.Zero, ProjectileSpeed = FP.Ratio(7, 10), SplashRadius = FP.Zero,
+                Bonuses = new[] { new BonusDamage(EntityTag.Spear, 3), new BonusDamage(EntityTag.Infantry, 2) },
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.EliteLongbowman,
+                Range = FP.FromInt(5), AttackTicks = 20, Speed = FP.Ratio(96, 1000), LineOfSight = 7, Size = 1,
+                Cost = new Cost(0, 35, 40, 0),
+                TrainTicks = 190, BuildTicks = 0, Population = 1, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[40] = new EntityDef
+            {
+                Kind = EntityKind.EliteLongbowman, Key = "EliteLongbowman", Name = "Elite Longbowman", Category = EntityCategory.Unit,
+                Tags = EntityTag.Military | EntityTag.Archer, MinAge = AgeId.Imperial,
+                MaxHp = 40, Attack = 7, MeleeArmor = 0, PierceArmor = 1,
+                AttackType = AttackType.Pierce, MinRange = FP.Zero, ProjectileSpeed = FP.Ratio(7, 10), SplashRadius = FP.Zero,
+                Bonuses = new[] { new BonusDamage(EntityTag.Spear, 3), new BonusDamage(EntityTag.Infantry, 3) },
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
+                Range = FP.FromInt(6), AttackTicks = 20, Speed = FP.Ratio(96, 1000), LineOfSight = 8, Size = 1,
+                Cost = new Cost(0, 35, 40, 0),
+                TrainTicks = 190, BuildTicks = 0, Population = 1, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
+            t[41] = new EntityDef
+            {
+                Kind = EntityKind.ArcheryRange, Key = "ArcheryRange", Name = "Archery Range", Category = EntityCategory.Building,
+                Tags = EntityTag.Conquest | EntityTag.Building, MinAge = AgeId.Feudal,
+                MaxHp = 1500, Attack = 0, MeleeArmor = 1, PierceArmor = 1,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
+                Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 6, Size = 3,
+                Cost = new Cost(0, 175, 0, 0),
+                TrainTicks = 0, BuildTicks = 500, Population = 0, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = new[] { EntityKind.Archer, EntityKind.Skirmisher },
+            };
+            t[42] = new EntityDef
+            {
+                Kind = EntityKind.Stable, Key = "Stable", Name = "Stable", Category = EntityCategory.Building,
+                Tags = EntityTag.Conquest | EntityTag.Building, MinAge = AgeId.Feudal,
+                MaxHp = 1500, Attack = 0, MeleeArmor = 1, PierceArmor = 1,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
+                Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 6, Size = 3,
+                Cost = new Cost(0, 175, 0, 0),
+                TrainTicks = 0, BuildTicks = 500, Population = 0, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = new[] { EntityKind.Scout, EntityKind.Knight },
+            };
+            t[43] = new EntityDef
+            {
+                Kind = EntityKind.SiegeWorkshop, Key = "SiegeWorkshop", Name = "Siege Workshop", Category = EntityCategory.Building,
+                Tags = EntityTag.Conquest | EntityTag.Building, MinAge = AgeId.Castle,
+                MaxHp = 1500, Attack = 0, MeleeArmor = 1, PierceArmor = 1,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
+                Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 6, Size = 3,
+                Cost = new Cost(0, 200, 0, 0),
+                TrainTicks = 0, BuildTicks = 400, Population = 0, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = new[] { EntityKind.BatteringRam, EntityKind.Mangonel },
+            };
+            t[44] = new EntityDef
+            {
+                Kind = EntityKind.Monastery, Key = "Monastery", Name = "Monastery", Category = EntityCategory.Building,
+                Tags = EntityTag.Conquest | EntityTag.Building, MinAge = AgeId.Castle,
+                MaxHp = 1500, Attack = 0, MeleeArmor = 1, PierceArmor = 1,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
+                Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 6, Size = 3,
+                Cost = new Cost(0, 175, 0, 0),
+                TrainTicks = 0, BuildTicks = 400, Population = 0, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = new[] { EntityKind.Monk },
+            };
+            t[45] = new EntityDef
+            {
+                Kind = EntityKind.Castle, Key = "Castle", Name = "Castle", Category = EntityCategory.Building,
+                Tags = EntityTag.Conquest | EntityTag.Shoots | EntityTag.Building, MinAge = AgeId.Castle,
+                MaxHp = 4800, Attack = 11, MeleeArmor = 8, PierceArmor = 11,
+                AttackType = AttackType.Pierce, MinRange = FP.Zero, ProjectileSpeed = FP.Ratio(7, 10), SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 5, GarrisonCapacity = 20, UpgradesTo = EntityKind.None,
+                Range = FP.FromInt(8), AttackTicks = 20, Speed = FP.Zero, LineOfSight = 11, Size = 4,
+                Cost = new Cost(0, 0, 0, 650),
+                TrainTicks = 0, BuildTicks = 2000, Population = 0, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = new[] { EntityKind.Longbowman, EntityKind.Trebuchet },
+            };
+            t[46] = new EntityDef
+            {
+                Kind = EntityKind.Tower, Key = "Tower", Name = "Watch Tower", Category = EntityCategory.Building,
+                Tags = EntityTag.Shoots | EntityTag.Building, MinAge = AgeId.Feudal,
+                MaxHp = 1020, Attack = 5, MeleeArmor = 1, PierceArmor = 7,
+                AttackType = AttackType.Pierce, MinRange = FP.Zero, ProjectileSpeed = FP.Ratio(7, 10), SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 1, GarrisonCapacity = 5, UpgradesTo = EntityKind.None,
+                Range = FP.FromInt(8), AttackTicks = 20, Speed = FP.Zero, LineOfSight = 10, Size = 1,
+                Cost = new Cost(0, 25, 0, 125),
+                TrainTicks = 0, BuildTicks = 800, Population = 0, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
                 Trains = System.Array.Empty<EntityKind>(),
             };
             return t;

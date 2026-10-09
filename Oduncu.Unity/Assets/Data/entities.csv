@@ -1,22 +1,54 @@
 # Units, buildings and resources. Ids are stored in command logs; never renumber or reuse.
-# Times are in seconds, Speed in tiles per second, Range in tiles, GatherRate in resource units
-# per second for one villager. The generator converts to ticks.
-# Housing is population supplied by a finished building. Tags and Trains are semicolon-separated keys.
-Id,Key,Name,Category,Tags,MinAge,MaxHp,Attack,MeleeArmor,PierceArmor,Range,ReloadSeconds,Speed,LineOfSight,Size,Food,Wood,Gold,Stone,TrainSeconds,BuildSeconds,Population,Housing,ResourceAmount,Yields,GatherRate,Trains
-1,Villager,Villager,unit,gatherer;builder,Dark,25,3,0,0,1.6,1.5,0.8,4,1,50,0,0,0,20,0,1,0,0,,0,
-2,Militia,Militia,unit,military;infantry,Dark,40,4,1,0,1.6,1.5,0.9,6,1,60,0,20,0,21,0,1,0,0,,0,
-3,TownCenter,Town Center,building,dropoff_food;dropoff_wood;dropoff_gold;dropoff_stone,Dark,2400,0,3,5,0,0,0,8,3,0,275,0,100,0,150,0,10,0,,0,Villager
-4,Barracks,Barracks,building,,Dark,1200,0,2,2,0,0,0,6,3,0,175,0,0,0,35,0,0,0,,0,Militia
-5,Tree,Tree,resource,,Dark,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,100,Wood,1.25,
-6,Forge,Forge,building,,Feudal,1500,0,1,1,0,0,0,6,3,0,150,0,0,0,40,0,0,0,,0,
-7,House,House,building,,Dark,550,0,0,5,0,0,0,2,2,0,25,0,0,0,25,0,5,0,,0,
-8,Mill,Mill,building,dropoff_food,Dark,1000,0,0,5,0,0,0,6,2,0,100,0,0,0,35,0,0,0,,0,
-9,LumberCamp,Lumber Camp,building,dropoff_wood,Dark,1000,0,0,5,0,0,0,6,2,0,100,0,0,0,35,0,0,0,,0,
-10,MiningCamp,Mining Camp,building,dropoff_gold;dropoff_stone,Dark,1000,0,0,5,0,0,0,6,2,0,100,0,0,0,35,0,0,0,,0,
-11,Farm,Farm,building,,Dark,480,0,0,0,0,0,0,1,2,0,60,0,0,0,15,0,0,175,Food,0.9,
-12,Berries,Berry Bush,resource,,Dark,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,125,Food,1,
-13,GoldMine,Gold Mine,resource,,Dark,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,800,Gold,1.2,
-14,StoneMine,Stone Mine,resource,,Dark,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,350,Stone,1.1,
-15,Sheep,Sheep,unit,animal;herdable,Dark,7,0,0,0,0,0,0.7,2,1,0,0,0,0,0,0,0,0,100,Food,1.1,
-16,Deer,Deer,unit,animal;flees,Dark,5,0,0,0,0,0,1.1,3,1,0,0,0,0,0,0,0,0,140,Food,1.3,
-17,Boar,Wild Boar,unit,animal;retaliates,Dark,40,2,0,0,1.6,2,0.8,6,1,0,0,0,0,0,0,0,0,340,Food,1.3,
+# Times are in seconds; Speed and ProjectileSpeed in tiles per second; Range, MinRange and SplashRadius
+# in tiles; GatherRate in resource units per second for one villager. The generator converts to ticks.
+# AttackType is melee or pierce (which armour applies). Bonus is tag:amount pairs added against targets
+# carrying the tag. Arrows is the base volley of a shooting building, plus one per garrisoned unit.
+# Housing is population supplied by a finished building. UpgradesTo names the next unit in the line,
+# which replaces this one on age-up. Tags, Bonus and Trains are semicolon-separated.
+Id,Key,Name,Category,Tags,MinAge,MaxHp,Attack,AttackType,MeleeArmor,PierceArmor,Range,MinRange,ReloadSeconds,ProjectileSpeed,SplashRadius,Bonus,Speed,LineOfSight,Size,Food,Wood,Gold,Stone,TrainSeconds,BuildSeconds,Population,Housing,Arrows,GarrisonCapacity,ResourceAmount,Yields,GatherRate,Trains,UpgradesTo
+1,Villager,Villager,unit,gatherer;builder,Dark,25,3,melee,0,0,1.6,0,1.5,0,0,,0.8,4,1,50,0,0,0,20,0,1,0,0,0,0,,0,,
+2,Militia,Militia,unit,military;infantry,Dark,40,4,melee,1,0,1.6,0,2,0,0,building:3,0.9,6,1,60,0,20,0,21,0,1,0,0,0,0,,0,,LongSwordsman
+3,TownCenter,Town Center,building,dropoff_food;dropoff_wood;dropoff_gold;dropoff_stone;conquest;shoots,Dark,2400,5,pierce,3,5,6,0,2,7,0,,0,8,3,0,275,0,100,0,150,0,10,1,15,0,,0,Villager,
+4,Barracks,Barracks,building,conquest,Dark,1200,0,,2,2,0,0,0,0,0,,0,6,3,0,175,0,0,0,35,0,0,0,0,0,,0,Militia;Spearman,
+5,Tree,Tree,resource,,Dark,0,0,,0,0,0,0,0,0,0,,0,0,1,0,0,0,0,0,0,0,0,0,0,100,Wood,1.25,,
+6,Forge,Forge,building,,Feudal,1500,0,,1,1,0,0,0,0,0,,0,6,3,0,150,0,0,0,40,0,0,0,0,0,,0,,
+7,House,House,building,,Dark,550,0,,0,5,0,0,0,0,0,,0,2,2,0,25,0,0,0,25,0,5,0,0,0,,0,,
+8,Mill,Mill,building,dropoff_food,Dark,1000,0,,0,5,0,0,0,0,0,,0,6,2,0,100,0,0,0,35,0,0,0,0,0,,0,,
+9,LumberCamp,Lumber Camp,building,dropoff_wood,Dark,1000,0,,0,5,0,0,0,0,0,,0,6,2,0,100,0,0,0,35,0,0,0,0,0,,0,,
+10,MiningCamp,Mining Camp,building,dropoff_gold;dropoff_stone,Dark,1000,0,,0,5,0,0,0,0,0,,0,6,2,0,100,0,0,0,35,0,0,0,0,0,,0,,
+11,Farm,Farm,building,,Dark,480,0,,0,0,0,0,0,0,0,,0,1,2,0,60,0,0,0,15,0,0,0,0,175,Food,0.9,,
+12,Berries,Berry Bush,resource,,Dark,0,0,,0,0,0,0,0,0,0,,0,0,1,0,0,0,0,0,0,0,0,0,0,125,Food,1,,
+13,GoldMine,Gold Mine,resource,,Dark,0,0,,0,0,0,0,0,0,0,,0,0,1,0,0,0,0,0,0,0,0,0,0,800,Gold,1.2,,
+14,StoneMine,Stone Mine,resource,,Dark,0,0,,0,0,0,0,0,0,0,,0,0,1,0,0,0,0,0,0,0,0,0,0,350,Stone,1.1,,
+15,Sheep,Sheep,unit,animal;herdable,Dark,7,0,,0,0,0,0,0,0,0,,0.7,2,1,0,0,0,0,0,0,0,0,0,0,100,Food,1.1,,
+16,Deer,Deer,unit,animal;flees,Dark,5,0,,0,0,0,0,0,0,0,,1.1,3,1,0,0,0,0,0,0,0,0,0,0,140,Food,1.3,,
+17,Boar,Wild Boar,unit,animal;retaliates,Dark,40,2,melee,0,0,1.6,0,2,0,0,,0.8,6,1,0,0,0,0,0,0,0,0,0,0,340,Food,1.3,,
+18,LongSwordsman,Long Swordsman,unit,military;infantry,Castle,60,9,melee,1,1,1.6,0,2,0,0,building:4,0.9,6,1,60,0,20,0,21,0,1,0,0,0,0,,0,,Champion
+19,Champion,Champion,unit,military;infantry,Imperial,70,13,melee,2,1,1.6,0,2,0,0,building:5,0.9,6,1,60,0,20,0,21,0,1,0,0,0,0,,0,,
+20,Spearman,Spearman,unit,military;infantry;spear,Feudal,45,3,melee,0,0,1.6,0,1.5,0,0,cavalry:15,1.0,6,1,35,25,0,0,22,0,1,0,0,0,0,,0,,Pikeman
+21,Pikeman,Pikeman,unit,military;infantry;spear,Castle,55,4,melee,0,0,1.6,0,1.5,0,0,cavalry:22,1.0,6,1,35,25,0,0,22,0,1,0,0,0,0,,0,,Halberdier
+22,Halberdier,Halberdier,unit,military;infantry;spear,Imperial,60,6,melee,0,0,1.6,0,1.5,0,0,cavalry:32,1.0,6,1,35,25,0,0,22,0,1,0,0,0,0,,0,,
+23,Archer,Archer,unit,military;archer,Feudal,30,4,pierce,0,0,4,0,2,7,0,spear:2;infantry:1,0.96,6,1,0,25,45,0,35,0,1,0,0,0,0,,0,,Crossbowman
+24,Crossbowman,Crossbowman,unit,military;archer,Castle,35,5,pierce,0,0,5,0,2,7,0,spear:3;infantry:6,0.96,7,1,0,25,45,0,27,0,1,0,0,0,0,,0,,Arbalester
+25,Arbalester,Arbalester,unit,military;archer,Imperial,40,6,pierce,0,0,5,0,2,7,0,spear:3;infantry:7,0.96,7,1,0,25,45,0,27,0,1,0,0,0,0,,0,,
+26,Skirmisher,Skirmisher,unit,military;archer;skirmisher,Feudal,30,2,pierce,0,3,4,0,3,7,0,archer:4;spear:3,0.96,6,1,25,35,0,0,22,0,1,0,0,0,0,,0,,EliteSkirmisher
+27,EliteSkirmisher,Elite Skirmisher,unit,military;archer;skirmisher,Castle,35,3,pierce,0,4,5,0,3,7,0,archer:5;spear:3,0.96,7,1,25,35,0,0,22,0,1,0,0,0,0,,0,,
+28,Scout,Scout Cavalry,unit,military;cavalry,Feudal,45,3,melee,0,2,1.6,0,2,0,0,monk:8;siege:8,1.55,8,1,80,0,0,0,30,0,1,0,0,0,0,,0,,LightCavalry
+29,LightCavalry,Light Cavalry,unit,military;cavalry,Castle,60,7,melee,0,2,1.6,0,2,0,0,monk:10;siege:12,1.5,8,1,80,0,0,0,30,0,1,0,0,0,0,,0,,Hussar
+30,Hussar,Hussar,unit,military;cavalry,Imperial,75,7,melee,0,2,1.6,0,1.9,0,0,monk:12;siege:14,1.5,9,1,80,0,0,0,30,0,1,0,0,0,0,,0,,
+31,Knight,Knight,unit,military;cavalry,Castle,100,10,melee,2,2,1.6,0,1.8,0,0,archer:4,1.35,5,1,60,0,75,0,30,0,1,0,0,0,0,,0,,Cavalier
+32,Cavalier,Cavalier,unit,military;cavalry,Imperial,120,12,melee,2,2,1.6,0,1.8,0,0,archer:5,1.35,5,1,60,0,75,0,30,0,1,0,0,0,0,,0,,
+33,BatteringRam,Battering Ram,unit,military;siege;targets_buildings,Castle,175,2,melee,0,180,1.6,0,5,0,0,building:125,0.5,3,1,0,160,75,0,36,0,1,0,0,0,0,,0,,CappedRam
+34,CappedRam,Capped Ram,unit,military;siege;targets_buildings,Imperial,200,3,melee,0,190,1.6,0,5,0,0,building:150,0.5,3,1,0,160,75,0,36,0,1,0,0,0,0,,0,,
+35,Mangonel,Mangonel,unit,military;siege,Castle,50,40,melee,0,6,7,3,6,5,1,building:20,0.6,9,1,0,160,135,0,46,0,1,0,0,0,0,,0,,Onager
+36,Onager,Onager,unit,military;siege,Imperial,60,50,melee,0,7,8,3,6,5,1,building:30,0.6,10,1,0,160,135,0,46,0,1,0,0,0,0,,0,,
+37,Trebuchet,Trebuchet,unit,military;siege;targets_buildings,Imperial,150,200,melee,2,150,16,4,10,5,0,building:250,0.8,19,1,0,200,200,0,50,0,1,0,0,0,0,,0,,
+38,Monk,Monk,unit,monk,Castle,30,0,melee,0,0,9,0,1,0,0,,0.7,11,1,0,0,100,0,51,0,1,0,0,0,0,,0,,
+39,Longbowman,Longbowman,unit,military;archer,Castle,35,6,pierce,0,0,5,0,2,7,0,spear:3;infantry:2,0.96,7,1,0,35,40,0,19,0,1,0,0,0,0,,0,,EliteLongbowman
+40,EliteLongbowman,Elite Longbowman,unit,military;archer,Imperial,40,7,pierce,0,1,6,0,2,7,0,spear:3;infantry:3,0.96,8,1,0,35,40,0,19,0,1,0,0,0,0,,0,,
+41,ArcheryRange,Archery Range,building,conquest,Feudal,1500,0,,1,1,0,0,0,0,0,,0,6,3,0,175,0,0,0,50,0,0,0,0,0,,0,Archer;Skirmisher,
+42,Stable,Stable,building,conquest,Feudal,1500,0,,1,1,0,0,0,0,0,,0,6,3,0,175,0,0,0,50,0,0,0,0,0,,0,Scout;Knight,
+43,SiegeWorkshop,Siege Workshop,building,conquest,Castle,1500,0,,1,1,0,0,0,0,0,,0,6,3,0,200,0,0,0,40,0,0,0,0,0,,0,BatteringRam;Mangonel,
+44,Monastery,Monastery,building,conquest,Castle,1500,0,,1,1,0,0,0,0,0,,0,6,3,0,175,0,0,0,40,0,0,0,0,0,,0,Monk,
+45,Castle,Castle,building,conquest;shoots,Castle,4800,11,pierce,8,11,8,0,2,7,0,,0,11,4,0,0,0,650,0,200,0,0,5,20,0,,0,Longbowman;Trebuchet,
+46,Tower,Watch Tower,building,shoots,Feudal,1020,5,pierce,1,7,8,0,2,7,0,,0,10,1,0,25,0,125,0,80,0,0,1,5,0,,0,,

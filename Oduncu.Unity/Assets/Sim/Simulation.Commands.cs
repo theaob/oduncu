@@ -24,6 +24,9 @@ namespace Oduncu.Sim
                 case CommandKind.Repair: ApplyRepair(c); break;
                 case CommandKind.SetAutoQueue: ApplySetAutoQueue(c); break;
                 case CommandKind.SetEconomyTargets: ApplySetEconomyTargets(c); break;
+                case CommandKind.Garrison: ApplyGarrison(c); break;
+                case CommandKind.Ungarrison: ApplyUngarrison(c); break;
+                case CommandKind.SetStance: ApplySetStance(c); break;
                 default: Reject("unknown command"); break;
             }
         }
@@ -33,23 +36,22 @@ namespace Oduncu.Sim
         private Entity OwnedUnit(Command c, int id)
         {
             Entity e = Find(id);
-            if (e == null || !e.IsUnit || e.Owner != c.Player) return null;
+            if (e == null || !e.IsUnit || e.Owner != c.Player || e.State == UnitState.Garrisoned) return null;
             return e;
         }
 
         private void ApplyMove(Command c)
         {
             if (!Map.InBounds(c.Cell)) { Reject("move target out of bounds"); return; }
+            List<Entity> group = _scratchUnits;
+            group.Clear();
             for (int i = 0; i < c.Units.Length; i++)
             {
                 Entity u = OwnedUnit(c, c.Units[i]);
-                if (u == null) continue;
-                u.State = UnitState.Moving;
-                u.MoveTarget = c.Cell;
-                u.HasPath = false;
-                u.TargetId = 0;
-                u.PreviousGatherSourceId = 0;
+                if (u != null) group.Add(u);
             }
+            OrderGroupMove(group, c.Cell);
+            group.Clear();
         }
 
         private void ApplyGather(Command c)
@@ -135,9 +137,11 @@ namespace Oduncu.Sim
             {
                 Entity u = OwnedUnit(c, c.Units[i]);
                 if (u == null || u.Def.IsAnimal) continue;
+                if (u.Def.HasTag(EntityTag.TargetsBuildings) && !target.IsBuilding) { Reject("can only attack buildings"); continue; }
+                if (u.Def.HasTag(EntityTag.Monk) && (!target.IsUnit || target.Def.IsAnimal)) { Reject("monks convert units only"); continue; }
+                SetIdle(u);
                 u.State = UnitState.Attacking;
                 u.TargetId = target.Id;
-                u.HasPath = false;
                 u.PreviousGatherSourceId = 0;
             }
         }
@@ -148,9 +152,7 @@ namespace Oduncu.Sim
             {
                 Entity u = OwnedUnit(c, c.Units[i]);
                 if (u == null) continue;
-                u.State = UnitState.Idle;
-                u.HasPath = false;
-                u.TargetId = 0;
+                SetIdle(u);
                 u.PreviousGatherSourceId = 0;
             }
         }
@@ -214,6 +216,39 @@ namespace Oduncu.Sim
             EconomyTargets targets = EconomyTargets.Unpack(c.Arg);
             if (!targets.IsValid) { Reject("economy targets must add up to 100"); return; }
             Players[c.Player].EconomyTargets = targets;
+        }
+
+        private void ApplyGarrison(Command c)
+        {
+            Entity b = OwnedBuilding(c);
+            if (b == null) { Reject("not your building"); return; }
+            if (b.UnderConstruction || b.Def.GarrisonCapacity == 0) { Reject("cannot garrison there"); return; }
+            for (int i = 0; i < c.Units.Length; i++)
+            {
+                Entity u = OwnedUnit(c, c.Units[i]);
+                if (u == null || !CanGarrisonIn(u, b)) continue;
+                SetIdle(u);
+                u.PreviousGatherSourceId = 0;
+                u.State = UnitState.Garrisoning;
+                u.TargetId = b.Id;
+            }
+        }
+
+        private void ApplyUngarrison(Command c)
+        {
+            Entity b = OwnedBuilding(c);
+            if (b == null) { Reject("not your building"); return; }
+            Eject(b);
+        }
+
+        private void ApplySetStance(Command c)
+        {
+            if (c.Arg != (int)Stance.Aggressive && c.Arg != (int)Stance.HoldGround) { Reject("unknown stance"); return; }
+            for (int i = 0; i < c.Units.Length; i++)
+            {
+                Entity u = OwnedUnit(c, c.Units[i]);
+                if (u != null) u.HoldGround = c.Arg == (int)Stance.HoldGround;
+            }
         }
     }
 }

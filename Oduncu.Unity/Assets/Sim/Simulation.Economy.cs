@@ -150,7 +150,7 @@ namespace Oduncu.Sim
                 u.HasPath = false;
                 if (u.Cooldown > 0) return;
                 u.Cooldown = u.Stats.AttackTicks;
-                DealDamage(u, animal, SimConstants.VillagerHuntDamage);
+                DealDamage(u.Id, animal, SimConstants.VillagerHuntDamage);
                 return;
             }
             if (!EnsurePathTo(u, animal)) { SetIdle(u); return; }
@@ -346,6 +346,7 @@ namespace Oduncu.Sim
         private void UpdateBuilding(Entity b)
         {
             if (b.UnderConstruction || b.Owner < 0) return;
+            if (b.Def.HasTag(EntityTag.Shoots)) UpdateShooting(b);
             PlayerState owner = Players[b.Owner];
             if (b.AutoQueue) AutoQueueVillager(b, owner);
             if (b.TrainQueue.Count == 0) return;

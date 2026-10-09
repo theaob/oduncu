@@ -298,7 +298,9 @@ namespace Oduncu.Tools.DataGen
                 default: throw r.Error("Category must be unit, building or resource");
             }
 
-            string tags = TagExpression(r, r["Tags"], tagByKey);
+            string tagList = r["Tags"];
+            if (category == "building") tagList = tagList.Length == 0 ? "building" : tagList + ";building";
+            string tags = TagExpression(r, tagList, tagByKey);
             string age = r["MinAge"];
             if (!ageKeys.Contains(age)) throw r.Error("unknown age " + age);
 
@@ -336,6 +338,26 @@ namespace Oduncu.Tools.DataGen
                 trains.Add("EntityKind." + t);
             }
 
+            string attackType = r["AttackType"];
+            if (attackType.Length == 0) attackType = "melee";
+            if (attackType != "melee" && attackType != "pierce") throw r.Error("AttackType must be melee or pierce");
+
+            var bonuses = new List<string>();
+            foreach (string pair in SplitList(r["Bonus"]))
+            {
+                string[] kv = pair.Split(':');
+                if (kv.Length != 2 || !tagByKey.TryGetValue(kv[0], out string bonusTag)) throw r.Error("Bonus entries are tag:amount with a known tag, got " + pair);
+                if (!int.TryParse(kv[1], NumberStyles.None, CultureInfo.InvariantCulture, out int amount)) throw r.Error("bad bonus amount in " + pair);
+                bonuses.Add("new BonusDamage(EntityTag." + bonusTag + ", " + amount + ")");
+            }
+
+            string upgrades = r["UpgradesTo"];
+            if (upgrades.Length != 0)
+            {
+                if (!byKey.TryGetValue(upgrades, out Entity next) || next.Row["Category"] != "unit") throw r.Error("UpgradesTo must be a unit, got " + upgrades);
+                if (category != "unit") throw r.Error("only units upgrade");
+            }
+
             sb.Append("            t[").Append(e.Id).Append("] = new EntityDef\n            {\n");
             sb.Append("                Kind = EntityKind.").Append(e.Key)
               .Append(", Key = \"").Append(e.Key).Append("\", Name = \"").Append(Escape(r["Name"])).Append("\"")
@@ -345,6 +367,16 @@ namespace Oduncu.Tools.DataGen
               .Append(", Attack = ").Append(Int(r, "Attack"))
               .Append(", MeleeArmor = ").Append(Int(r, "MeleeArmor"))
               .Append(", PierceArmor = ").Append(Int(r, "PierceArmor")).Append(",\n");
+            sb.Append("                AttackType = AttackType.").Append(attackType == "melee" ? "Melee" : "Pierce")
+              .Append(", MinRange = ").Append(Fp(r, "MinRange", 1))
+              .Append(", ProjectileSpeed = ").Append(Fp(r, "ProjectileSpeed", TicksPerSecond))
+              .Append(", SplashRadius = ").Append(Fp(r, "SplashRadius", 1)).Append(",\n");
+            sb.Append("                Bonuses = ");
+            if (bonuses.Count == 0) sb.Append("System.Array.Empty<BonusDamage>()");
+            else sb.Append("new[] { ").Append(string.Join(", ", bonuses)).Append(" }");
+            sb.Append(",\n");
+            sb.Append("                Arrows = ").Append(Int(r, "Arrows")).Append(", GarrisonCapacity = ").Append(Int(r, "GarrisonCapacity"))
+              .Append(", UpgradesTo = EntityKind.").Append(upgrades.Length == 0 ? "None" : upgrades).Append(",\n");
             sb.Append("                Range = ").Append(Fp(r, "Range", 1)).Append(", AttackTicks = ").Append(Seconds(r, "ReloadSeconds"))
               .Append(", Speed = ").Append(Fp(r, "Speed", TicksPerSecond)).Append(", LineOfSight = ").Append(Int(r, "LineOfSight"))
               .Append(", Size = ").Append(Int(r, "Size")).Append(",\n");

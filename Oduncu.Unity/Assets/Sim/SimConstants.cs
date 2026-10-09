@@ -52,5 +52,27 @@ namespace Oduncu.Sim
 
         /// <summary>How often a unit chasing a moving target recomputes its path.</summary>
         public const int ChaseRepathInterval = 10;
+
+        // ------------------------------------------------------------------ combat (plan 3.4)
+
+        /// <summary>Preallocated projectile slots; more in flight than this is a bug, not a balance case.</summary>
+        public const int MaxProjectiles = 1024;
+
+        /// <summary>Monks convert a unit after channelling this long in range.</summary>
+        public const int ConversionTicks = 40;
+        /// <summary>Monks heal one hit point this often.</summary>
+        public const int HealInterval = 5;
+
+        /// <summary>Unit centres closer than this push apart.</summary>
+        public static readonly FP SeparationRadius = FP.Ratio(6, 10);
+        /// <summary>Most a unit is pushed in one tick, in tiles.</summary>
+        public static readonly FP MaxSeparationPush = FP.Ratio(1, 10);
+
+        /// <summary>Group moves with more units than this share a flow field.</summary>
+        public const int FlowFieldGroupThreshold = 8;
+        /// <summary>Cached flow fields; the least recently used is recomputed for a new goal.</summary>
+        public const int FlowFieldPoolSize = 8;
+        /// <summary>Units following a flow field switch to A* to their own slot this close to the goal.</summary>
+        public const int FlowHandoffDistance = 6;
     }
 }

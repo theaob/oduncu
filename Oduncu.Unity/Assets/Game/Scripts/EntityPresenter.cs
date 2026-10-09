@@ -56,7 +56,8 @@ namespace Oduncu.Game
             for (int i = 0; i < entities.Count; i++)
             {
                 Entity e = entities[i];
-                if (!e.Alive) continue;
+                // Garrisoned units are inside a building: their view goes away and comes back on eject.
+                if (!e.Alive || e.State == UnitState.Garrisoned) continue;
                 _seen.Add(e.Id);
                 EntityView view;
                 if (!_views.TryGetValue(e.Id, out view))
