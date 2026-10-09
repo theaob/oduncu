@@ -94,6 +94,7 @@ namespace Oduncu.Sim
             _hasher.Write(_nextId);
             _hasher.Write(Winner);
             _hasher.Write(MatchEndTick);
+            WriteMarketState(_hasher);
             _hasher.Write(_projectiles.Count);
             for (int i = 0; i < _projectiles.Count; i++) _projectiles[i].WriteState(_hasher);
             for (int i = 0; i < Players.Length; i++) Players[i].WriteState(_hasher);
@@ -231,7 +232,8 @@ namespace Oduncu.Sim
             for (int i = 0; i < _entities.Count; i++)
             {
                 Entity e = _entities[i];
-                if (e.Alive && e.Owner == owner && e.IsBuilding) n += e.TrainQueue.Count;
+                if (!e.Alive || e.Owner != owner || !e.IsBuilding) continue;
+                for (int q = 0; q < e.TrainQueue.Count; q++) if (!e.TrainQueue[q].IsResearch) n++;
             }
             return n;
         }

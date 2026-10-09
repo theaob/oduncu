@@ -75,7 +75,7 @@ and the headless test suite must print the same value. The reference value for t
 simulation code, seed 4242 and 10,000 ticks is:
 
 ```
-DETERMINISM_HASH 563B1B50AC8F2610
+DETERMINISM_HASH 867851F77F5AEFC7
 ```
 
 Any change to simulation rules changes this value; update it in the same commit (a test

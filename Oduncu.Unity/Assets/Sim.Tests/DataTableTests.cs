@@ -55,6 +55,11 @@ namespace Oduncu.Sim.Tests
             {
                 TechDef tech = GameData.Techs[i];
                 if (tech == null) continue;
+                if (tech.IsCivBonus)
+                {
+                    Assert.AreNotEqual(CivId.None, tech.Civ, tech.Key + " has no building and no civilization");
+                    continue;
+                }
                 EntityDef at = EntityDefs.Get(tech.ResearchedAt);
                 Assert.IsNotNull(at, tech.Key + " researched at a missing kind");
                 Assert.IsTrue(at.IsBuilding, tech.Key + " researched at " + at.Key + ", which is not a building");

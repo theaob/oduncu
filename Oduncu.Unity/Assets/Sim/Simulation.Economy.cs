@@ -135,7 +135,7 @@ namespace Oduncu.Sim
             u.Carry++;
             source.Amount--;
             if (source.Amount <= 0 && !source.IsBuilding) Kill(source);
-            if (u.Carry >= SimConstants.VillagerCarryCapacity)
+            if (u.Carry >= u.Stats.CarryCapacity)
             {
                 u.State = UnitState.Returning;
                 u.HasPath = false;
@@ -332,7 +332,7 @@ namespace Oduncu.Sim
                 else if (e.IsBuilding && !e.UnderConstruction)
                 {
                     p.PopulationCap += e.Def.Housing;
-                    if (e.TrainQueue.Count > 0 && e.TrainProgress > 0) p.Population += EntityDefs.Get(e.TrainQueue[0].Unit).Population;
+                    if (e.TrainQueue.Count > 0 && e.TrainProgress > 0 && !e.TrainQueue[0].IsResearch) p.Population += EntityDefs.Get(e.TrainQueue[0].Unit).Population;
                 }
             }
             for (int p = 0; p < Players.Length; p++)
@@ -351,7 +351,19 @@ namespace Oduncu.Sim
             if (b.AutoQueue) AutoQueueVillager(b, owner);
             if (b.TrainQueue.Count == 0) return;
 
-            EntityKind kind = b.TrainQueue[0].Unit;
+            QueueItem item = b.TrainQueue[0];
+            if (item.IsResearch)
+            {
+                b.TrainProgress++;
+                if (b.TrainProgress < ResearchTicksOf(item)) return;
+                b.TrainProgress = 0;
+                b.TrainQueue.RemoveAt(0);
+                if (item.IsAgeUp) CompleteAge(b.Owner, item.Age);
+                else CompleteResearch(b.Owner, item.Tech);
+                return;
+            }
+
+            EntityKind kind = item.Unit;
             if (b.TrainProgress == 0)
             {
                 // Housed: hold the queue (never reject) until there is room.
@@ -367,7 +379,8 @@ namespace Oduncu.Sim
 
             b.TrainProgress = 0;
             b.TrainQueue.RemoveAt(0);
-            Entity unit = SpawnUnit(kind, b.Owner, spawnCell);
+            // A unit queued before an age-up comes out as the upgraded line member.
+            Entity unit = SpawnUnit(LineMemberFor(kind, owner.Age), b.Owner, spawnCell);
             SendToRally(b, unit);
         }
 

@@ -17,6 +17,10 @@ namespace Oduncu.Sim
         public Cost Cost;
         /// <summary>For gatherable kinds: units per tick a villager of this player collects.</summary>
         public FP GatherRate;
+        /// <summary>Resources a gatherer carries before walking to a drop-off.</summary>
+        public int CarryCapacity;
+        /// <summary>Area damage radius of this kind's shots, in tiles.</summary>
+        public FP SplashRadius;
 
         internal void CopyFrom(EntityDef d)
         {
@@ -32,6 +36,8 @@ namespace Oduncu.Sim
             BuildTicks = d.BuildTicks;
             Cost = d.Cost;
             GatherRate = d.GatherRate;
+            CarryCapacity = d.CanGather ? SimConstants.VillagerCarryCapacity : 0;
+            SplashRadius = d.SplashRadius;
         }
 
         internal void Apply(StatId stat, EffectOp op, FP value)
@@ -53,6 +59,8 @@ namespace Oduncu.Sim
                 case StatId.CostGold: Cost = new Cost(Cost.Food, Cost.Wood, Max(0, Combine(Cost.Gold, op, value)), Cost.Stone); break;
                 case StatId.CostStone: Cost = new Cost(Cost.Food, Cost.Wood, Cost.Gold, Max(0, Combine(Cost.Stone, op, value))); break;
                 case StatId.GatherRate: GatherRate = FP.Max(FP.Zero, op == EffectOp.Add ? GatherRate + value : GatherRate * value); break;
+                case StatId.CarryCapacity: CarryCapacity = Max(1, Combine(CarryCapacity, op, value)); break;
+                case StatId.Splash: SplashRadius = FP.Max(FP.Zero, op == EffectOp.Add ? SplashRadius + value : SplashRadius * value); break;
             }
         }
 

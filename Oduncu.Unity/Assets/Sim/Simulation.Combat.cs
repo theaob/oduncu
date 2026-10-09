@@ -117,7 +117,7 @@ namespace Oduncu.Sim
                 TargetId = target.Id,
                 Impact = target.Position,
                 From = from,
-                Splash = attacker.Def.SplashRadius,
+                Splash = attacker.Stats.SplashRadius,
                 FireTick = CurrentTick,
                 LandTick = CurrentTick + delay,
             };

@@ -27,6 +27,10 @@ namespace Oduncu.Sim
                 case CommandKind.Garrison: ApplyGarrison(c); break;
                 case CommandKind.Ungarrison: ApplyUngarrison(c); break;
                 case CommandKind.SetStance: ApplySetStance(c); break;
+                case CommandKind.Research: ApplyResearch(c); break;
+                case CommandKind.AgeUp: ApplyAgeUp(c); break;
+                case CommandKind.MarketBuy: ApplyMarketBuy(c); break;
+                case CommandKind.MarketSell: ApplyMarketSell(c); break;
                 default: Reject("unknown command"); break;
             }
         }
@@ -70,6 +74,7 @@ namespace Oduncu.Sim
         {
             EntityDef def = EntityDefs.Get(c.EntityType);
             if (!def.IsBuilding || c.EntityType == EntityKind.TownCenter) { Reject("cannot build that"); return; }
+            if (def.MinAge > Players[c.Player].Age) { Reject(RequiresAge(def.MinAge)); return; }
             var rect = new CellRect(c.Cell.X, c.Cell.Y, def.Size);
             if (!Map.IsRectInBounds(rect)) { Reject("footprint out of bounds"); return; }
             if (!Map.IsRectFree(rect)) { Reject("footprint blocked"); return; }
@@ -106,16 +111,20 @@ namespace Oduncu.Sim
             Entity b = Find(c.Target);
             if (b == null || !b.IsBuilding || b.Owner != c.Player) { Reject("not your building"); return; }
             if (b.UnderConstruction) { Reject("building under construction"); return; }
+            // Lines upgrade on age-up, so ordering any member of a line trains the current one.
+            AgeId age = Players[c.Player].Age;
+            EntityKind kind = LineMemberFor(c.EntityType, age);
             bool allowed = false;
-            for (int i = 0; i < b.Def.Trains.Length; i++) if (b.Def.Trains[i] == c.EntityType) allowed = true;
+            for (int i = 0; i < b.Def.Trains.Length; i++) if (LineMemberFor(b.Def.Trains[i], age) == kind) allowed = true;
             if (!allowed) { Reject("building cannot train that"); return; }
+            if (EntityDefs.Get(kind).MinAge > age) { Reject(RequiresAge(EntityDefs.Get(kind).MinAge)); return; }
             if (b.TrainQueue.Count >= SimConstants.TrainQueueLength) { Reject("queue full"); return; }
             // No population check here: a housed queue is held, not rejected (see UpdateBuilding).
             PlayerState player = Players[c.Player];
-            Cost cost = player.Stats.Of(c.EntityType).Cost;
+            Cost cost = player.Stats.Of(kind).Cost;
             if (!player.CanAfford(cost)) { Reject(player.ShortageMessage(cost)); return; }
             player.Pay(cost);
-            b.TrainQueue.Add(new QueueItem { Unit = c.EntityType, Paid = cost });
+            b.TrainQueue.Add(new QueueItem { Unit = kind, Paid = cost });
         }
 
         /// <summary>Remove one queue slot (Arg is the slot index) and refund exactly what was paid for it.</summary>

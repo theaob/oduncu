@@ -53,6 +53,7 @@ namespace Oduncu.Sim
         Monastery = 44,
         Castle = 45,
         Tower = 46,
+        Market = 47,
     }
 
     [System.Flags]
@@ -97,13 +98,50 @@ namespace Oduncu.Sim
         MeleeAttack1 = 1,
         MeleeAttack2 = 2,
         MeleeAttack3 = 3,
+        ArcherAttack1 = 4,
+        ArcherAttack2 = 5,
+        ArcherAttack3 = 6,
+        InfantryArmor1 = 7,
+        InfantryArmor2 = 8,
+        InfantryArmor3 = 9,
+        CavalryArmor1 = 10,
+        CavalryArmor2 = 11,
+        CavalryArmor3 = 12,
+        ArcherArmor1 = 13,
+        ArcherArmor2 = 14,
+        ArcherArmor3 = 15,
+        Woodcutting1 = 16,
+        Woodcutting2 = 17,
+        Farming1 = 18,
+        Farming2 = 19,
+        GoldMining1 = 20,
+        GoldMining2 = 21,
+        StoneMining1 = 22,
+        StoneMining2 = 23,
+        Loom = 24,
+        Wheelbarrow = 25,
+        HandCart = 26,
+        TownWatch = 27,
+        Yeomen = 28,
+        Warwolf = 29,
+        Sanctity = 30,
+        Fervor = 31,
+        WoodlandersCamps = 32,
+        WoodlandersForestry = 33,
+        WoodlandersMarksmen = 34,
+    }
+
+    public enum CivId : byte
+    {
+        None = 0,
+        Woodlanders = 1,
     }
 
     public static partial class GameData
     {
         public const int GeneratedTicksPerSecond = 10;
-        public const int EntityKindCount = 47;
-        public const int TechCount = 4;
+        public const int EntityKindCount = 48;
+        public const int TechCount = 35;
         public const int AgeCount = 4;
         public const int EconomyPresetCount = 12;
 
@@ -649,7 +687,7 @@ namespace Oduncu.Sim
                 Tags = EntityTag.Military | EntityTag.Archer, MinAge = AgeId.Castle,
                 MaxHp = 35, Attack = 6, MeleeArmor = 0, PierceArmor = 0,
                 AttackType = AttackType.Pierce, MinRange = FP.Zero, ProjectileSpeed = FP.Ratio(7, 10), SplashRadius = FP.Zero,
-                Bonuses = new[] { new BonusDamage(EntityTag.Spear, 3), new BonusDamage(EntityTag.Infantry, 2) },
+                Bonuses = new[] { new BonusDamage(EntityTag.Spear, 3), new BonusDamage(EntityTag.Infantry, 6) },
                 Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.EliteLongbowman,
                 Range = FP.FromInt(5), AttackTicks = 20, Speed = FP.Ratio(96, 1000), LineOfSight = 7, Size = 1,
                 Cost = new Cost(0, 35, 40, 0),
@@ -663,7 +701,7 @@ namespace Oduncu.Sim
                 Tags = EntityTag.Military | EntityTag.Archer, MinAge = AgeId.Imperial,
                 MaxHp = 40, Attack = 7, MeleeArmor = 0, PierceArmor = 1,
                 AttackType = AttackType.Pierce, MinRange = FP.Zero, ProjectileSpeed = FP.Ratio(7, 10), SplashRadius = FP.Zero,
-                Bonuses = new[] { new BonusDamage(EntityTag.Spear, 3), new BonusDamage(EntityTag.Infantry, 3) },
+                Bonuses = new[] { new BonusDamage(EntityTag.Spear, 3), new BonusDamage(EntityTag.Infantry, 7) },
                 Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
                 Range = FP.FromInt(6), AttackTicks = 20, Speed = FP.Ratio(96, 1000), LineOfSight = 8, Size = 1,
                 Cost = new Cost(0, 35, 40, 0),
@@ -755,6 +793,20 @@ namespace Oduncu.Sim
                 ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
                 Trains = System.Array.Empty<EntityKind>(),
             };
+            t[47] = new EntityDef
+            {
+                Kind = EntityKind.Market, Key = "Market", Name = "Market", Category = EntityCategory.Building,
+                Tags = EntityTag.Building, MinAge = AgeId.Feudal,
+                MaxHp = 2100, Attack = 0, MeleeArmor = 0, PierceArmor = 7,
+                AttackType = AttackType.Melee, MinRange = FP.Zero, ProjectileSpeed = FP.Zero, SplashRadius = FP.Zero,
+                Bonuses = System.Array.Empty<BonusDamage>(),
+                Arrows = 0, GarrisonCapacity = 0, UpgradesTo = EntityKind.None,
+                Range = FP.Zero, AttackTicks = 0, Speed = FP.Zero, LineOfSight = 6, Size = 3,
+                Cost = new Cost(0, 175, 0, 0),
+                TrainTicks = 0, BuildTicks = 500, Population = 0, Housing = 0,
+                ResourceAmount = 0, Yields = ResourceKind.None, GatherRate = FP.Zero,
+                Trains = System.Array.Empty<EntityKind>(),
+            };
             return t;
         }
 
@@ -767,21 +819,238 @@ namespace Oduncu.Sim
                 Id = TechId.MeleeAttack1, Key = "MeleeAttack1", Name = "Melee Attack I",
                 Description = "+1 attack for infantry and cavalry",
                 ResearchedAt = EntityKind.Forge, MinAge = AgeId.Feudal, Cost = new Cost(150, 0, 0, 0),
-                ResearchTicks = 500, Requires = TechId.None,
+                ResearchTicks = 500, Requires = TechId.None, Civ = CivId.None,
             };
             t[2] = new TechDef
             {
                 Id = TechId.MeleeAttack2, Key = "MeleeAttack2", Name = "Melee Attack II",
                 Description = "+1 attack for infantry and cavalry",
                 ResearchedAt = EntityKind.Forge, MinAge = AgeId.Castle, Cost = new Cost(220, 0, 120, 0),
-                ResearchTicks = 650, Requires = TechId.MeleeAttack1,
+                ResearchTicks = 650, Requires = TechId.MeleeAttack1, Civ = CivId.None,
             };
             t[3] = new TechDef
             {
                 Id = TechId.MeleeAttack3, Key = "MeleeAttack3", Name = "Melee Attack III",
                 Description = "+2 attack for infantry and cavalry",
                 ResearchedAt = EntityKind.Forge, MinAge = AgeId.Imperial, Cost = new Cost(275, 0, 225, 0),
-                ResearchTicks = 750, Requires = TechId.MeleeAttack2,
+                ResearchTicks = 750, Requires = TechId.MeleeAttack2, Civ = CivId.None,
+            };
+            t[4] = new TechDef
+            {
+                Id = TechId.ArcherAttack1, Key = "ArcherAttack1", Name = "Archer Attack I",
+                Description = "+1 attack for archers and shooting buildings",
+                ResearchedAt = EntityKind.Forge, MinAge = AgeId.Feudal, Cost = new Cost(100, 0, 50, 0),
+                ResearchTicks = 300, Requires = TechId.None, Civ = CivId.None,
+            };
+            t[5] = new TechDef
+            {
+                Id = TechId.ArcherAttack2, Key = "ArcherAttack2", Name = "Archer Attack II",
+                Description = "+1 attack for archers and shooting buildings",
+                ResearchedAt = EntityKind.Forge, MinAge = AgeId.Castle, Cost = new Cost(200, 0, 100, 0),
+                ResearchTicks = 500, Requires = TechId.ArcherAttack1, Civ = CivId.None,
+            };
+            t[6] = new TechDef
+            {
+                Id = TechId.ArcherAttack3, Key = "ArcherAttack3", Name = "Archer Attack III",
+                Description = "+1 attack for archers and shooting buildings",
+                ResearchedAt = EntityKind.Forge, MinAge = AgeId.Imperial, Cost = new Cost(300, 0, 200, 0),
+                ResearchTicks = 600, Requires = TechId.ArcherAttack2, Civ = CivId.None,
+            };
+            t[7] = new TechDef
+            {
+                Id = TechId.InfantryArmor1, Key = "InfantryArmor1", Name = "Infantry Armour I",
+                Description = "+1 melee and pierce armour for infantry",
+                ResearchedAt = EntityKind.Forge, MinAge = AgeId.Feudal, Cost = new Cost(100, 0, 0, 0),
+                ResearchTicks = 400, Requires = TechId.None, Civ = CivId.None,
+            };
+            t[8] = new TechDef
+            {
+                Id = TechId.InfantryArmor2, Key = "InfantryArmor2", Name = "Infantry Armour II",
+                Description = "+1 melee and pierce armour for infantry",
+                ResearchedAt = EntityKind.Forge, MinAge = AgeId.Castle, Cost = new Cost(200, 0, 100, 0),
+                ResearchTicks = 500, Requires = TechId.InfantryArmor1, Civ = CivId.None,
+            };
+            t[9] = new TechDef
+            {
+                Id = TechId.InfantryArmor3, Key = "InfantryArmor3", Name = "Infantry Armour III",
+                Description = "+1 melee and pierce armour for infantry",
+                ResearchedAt = EntityKind.Forge, MinAge = AgeId.Imperial, Cost = new Cost(300, 0, 150, 0),
+                ResearchTicks = 600, Requires = TechId.InfantryArmor2, Civ = CivId.None,
+            };
+            t[10] = new TechDef
+            {
+                Id = TechId.CavalryArmor1, Key = "CavalryArmor1", Name = "Cavalry Armour I",
+                Description = "+1 melee and pierce armour for cavalry",
+                ResearchedAt = EntityKind.Forge, MinAge = AgeId.Feudal, Cost = new Cost(150, 0, 0, 0),
+                ResearchTicks = 400, Requires = TechId.None, Civ = CivId.None,
+            };
+            t[11] = new TechDef
+            {
+                Id = TechId.CavalryArmor2, Key = "CavalryArmor2", Name = "Cavalry Armour II",
+                Description = "+1 melee and pierce armour for cavalry",
+                ResearchedAt = EntityKind.Forge, MinAge = AgeId.Castle, Cost = new Cost(250, 0, 150, 0),
+                ResearchTicks = 550, Requires = TechId.CavalryArmor1, Civ = CivId.None,
+            };
+            t[12] = new TechDef
+            {
+                Id = TechId.CavalryArmor3, Key = "CavalryArmor3", Name = "Cavalry Armour III",
+                Description = "+1 melee and pierce armour for cavalry",
+                ResearchedAt = EntityKind.Forge, MinAge = AgeId.Imperial, Cost = new Cost(350, 0, 200, 0),
+                ResearchTicks = 650, Requires = TechId.CavalryArmor2, Civ = CivId.None,
+            };
+            t[13] = new TechDef
+            {
+                Id = TechId.ArcherArmor1, Key = "ArcherArmor1", Name = "Archer Armour I",
+                Description = "+1 melee and pierce armour for archers",
+                ResearchedAt = EntityKind.Forge, MinAge = AgeId.Feudal, Cost = new Cost(100, 0, 0, 0),
+                ResearchTicks = 400, Requires = TechId.None, Civ = CivId.None,
+            };
+            t[14] = new TechDef
+            {
+                Id = TechId.ArcherArmor2, Key = "ArcherArmor2", Name = "Archer Armour II",
+                Description = "+1 melee and pierce armour for archers",
+                ResearchedAt = EntityKind.Forge, MinAge = AgeId.Castle, Cost = new Cost(150, 0, 150, 0),
+                ResearchTicks = 500, Requires = TechId.ArcherArmor1, Civ = CivId.None,
+            };
+            t[15] = new TechDef
+            {
+                Id = TechId.ArcherArmor3, Key = "ArcherArmor3", Name = "Archer Armour III",
+                Description = "+1 melee and pierce armour for archers",
+                ResearchedAt = EntityKind.Forge, MinAge = AgeId.Imperial, Cost = new Cost(250, 0, 250, 0),
+                ResearchTicks = 600, Requires = TechId.ArcherArmor2, Civ = CivId.None,
+            };
+            t[16] = new TechDef
+            {
+                Id = TechId.Woodcutting1, Key = "Woodcutting1", Name = "Double-Bit Axe",
+                Description = "Villagers chop wood 20% faster",
+                ResearchedAt = EntityKind.LumberCamp, MinAge = AgeId.Dark, Cost = new Cost(100, 50, 0, 0),
+                ResearchTicks = 250, Requires = TechId.None, Civ = CivId.None,
+            };
+            t[17] = new TechDef
+            {
+                Id = TechId.Woodcutting2, Key = "Woodcutting2", Name = "Bow Saw",
+                Description = "Villagers chop wood another 20% faster",
+                ResearchedAt = EntityKind.LumberCamp, MinAge = AgeId.Feudal, Cost = new Cost(150, 100, 0, 0),
+                ResearchTicks = 500, Requires = TechId.Woodcutting1, Civ = CivId.None,
+            };
+            t[18] = new TechDef
+            {
+                Id = TechId.Farming1, Key = "Farming1", Name = "Horse Collar",
+                Description = "Farms yield food 15% faster",
+                ResearchedAt = EntityKind.Mill, MinAge = AgeId.Dark, Cost = new Cost(75, 75, 0, 0),
+                ResearchTicks = 200, Requires = TechId.None, Civ = CivId.None,
+            };
+            t[19] = new TechDef
+            {
+                Id = TechId.Farming2, Key = "Farming2", Name = "Heavy Plow",
+                Description = "Farms and berries yield food another 15% faster",
+                ResearchedAt = EntityKind.Mill, MinAge = AgeId.Feudal, Cost = new Cost(125, 125, 0, 0),
+                ResearchTicks = 400, Requires = TechId.Farming1, Civ = CivId.None,
+            };
+            t[20] = new TechDef
+            {
+                Id = TechId.GoldMining1, Key = "GoldMining1", Name = "Gold Mining",
+                Description = "Villagers mine gold 15% faster",
+                ResearchedAt = EntityKind.MiningCamp, MinAge = AgeId.Dark, Cost = new Cost(100, 75, 0, 0),
+                ResearchTicks = 300, Requires = TechId.None, Civ = CivId.None,
+            };
+            t[21] = new TechDef
+            {
+                Id = TechId.GoldMining2, Key = "GoldMining2", Name = "Gold Shaft Mining",
+                Description = "Villagers mine gold another 15% faster",
+                ResearchedAt = EntityKind.MiningCamp, MinAge = AgeId.Castle, Cost = new Cost(200, 150, 0, 0),
+                ResearchTicks = 600, Requires = TechId.GoldMining1, Civ = CivId.None,
+            };
+            t[22] = new TechDef
+            {
+                Id = TechId.StoneMining1, Key = "StoneMining1", Name = "Stone Mining",
+                Description = "Villagers mine stone 15% faster",
+                ResearchedAt = EntityKind.MiningCamp, MinAge = AgeId.Dark, Cost = new Cost(100, 75, 0, 0),
+                ResearchTicks = 300, Requires = TechId.None, Civ = CivId.None,
+            };
+            t[23] = new TechDef
+            {
+                Id = TechId.StoneMining2, Key = "StoneMining2", Name = "Stone Shaft Mining",
+                Description = "Villagers mine stone another 15% faster",
+                ResearchedAt = EntityKind.MiningCamp, MinAge = AgeId.Castle, Cost = new Cost(200, 150, 0, 0),
+                ResearchTicks = 600, Requires = TechId.StoneMining1, Civ = CivId.None,
+            };
+            t[24] = new TechDef
+            {
+                Id = TechId.Loom, Key = "Loom", Name = "Loom",
+                Description = "Villagers get +15 hit points and +1 melee and pierce armour",
+                ResearchedAt = EntityKind.TownCenter, MinAge = AgeId.Dark, Cost = new Cost(0, 0, 50, 0),
+                ResearchTicks = 250, Requires = TechId.None, Civ = CivId.None,
+            };
+            t[25] = new TechDef
+            {
+                Id = TechId.Wheelbarrow, Key = "Wheelbarrow", Name = "Wheelbarrow",
+                Description = "Villagers move 10% faster and carry 3 more",
+                ResearchedAt = EntityKind.TownCenter, MinAge = AgeId.Feudal, Cost = new Cost(175, 50, 0, 0),
+                ResearchTicks = 750, Requires = TechId.None, Civ = CivId.None,
+            };
+            t[26] = new TechDef
+            {
+                Id = TechId.HandCart, Key = "HandCart", Name = "Hand Cart",
+                Description = "Villagers move 10% faster and carry 5 more",
+                ResearchedAt = EntityKind.TownCenter, MinAge = AgeId.Castle, Cost = new Cost(300, 200, 0, 0),
+                ResearchTicks = 550, Requires = TechId.Wheelbarrow, Civ = CivId.None,
+            };
+            t[27] = new TechDef
+            {
+                Id = TechId.TownWatch, Key = "TownWatch", Name = "Town Watch",
+                Description = "+4 line of sight for all buildings",
+                ResearchedAt = EntityKind.TownCenter, MinAge = AgeId.Feudal, Cost = new Cost(75, 0, 0, 0),
+                ResearchTicks = 250, Requires = TechId.None, Civ = CivId.None,
+            };
+            t[28] = new TechDef
+            {
+                Id = TechId.Yeomen, Key = "Yeomen", Name = "Yeomen",
+                Description = "+1 range for archers and longbowmen",
+                ResearchedAt = EntityKind.Castle, MinAge = AgeId.Castle, Cost = new Cost(450, 0, 300, 0),
+                ResearchTicks = 600, Requires = TechId.None, Civ = CivId.Woodlanders,
+            };
+            t[29] = new TechDef
+            {
+                Id = TechId.Warwolf, Key = "Warwolf", Name = "Warwolf",
+                Description = "Trebuchet shots splash 1 tile",
+                ResearchedAt = EntityKind.Castle, MinAge = AgeId.Imperial, Cost = new Cost(0, 800, 400, 0),
+                ResearchTicks = 600, Requires = TechId.None, Civ = CivId.Woodlanders,
+            };
+            t[30] = new TechDef
+            {
+                Id = TechId.Sanctity, Key = "Sanctity", Name = "Sanctity",
+                Description = "+15 hit points for monks",
+                ResearchedAt = EntityKind.Monastery, MinAge = AgeId.Castle, Cost = new Cost(0, 0, 120, 0),
+                ResearchTicks = 600, Requires = TechId.None, Civ = CivId.None,
+            };
+            t[31] = new TechDef
+            {
+                Id = TechId.Fervor, Key = "Fervor", Name = "Fervor",
+                Description = "Monks move 15% faster",
+                ResearchedAt = EntityKind.Monastery, MinAge = AgeId.Castle, Cost = new Cost(0, 0, 140, 0),
+                ResearchTicks = 500, Requires = TechId.None, Civ = CivId.None,
+            };
+            t[32] = new TechDef
+            {
+                Id = TechId.WoodlandersCamps, Key = "WoodlandersCamps", Name = "Woodland Camps",
+                Description = "Lumber camps cost 50% less wood",
+                ResearchedAt = EntityKind.None, MinAge = AgeId.Dark, Cost = new Cost(0, 0, 0, 0),
+                ResearchTicks = 0, Requires = TechId.None, Civ = CivId.Woodlanders,
+            };
+            t[33] = new TechDef
+            {
+                Id = TechId.WoodlandersForestry, Key = "WoodlandersForestry", Name = "Forestry",
+                Description = "Wood is gathered 15% faster",
+                ResearchedAt = EntityKind.None, MinAge = AgeId.Dark, Cost = new Cost(0, 0, 0, 0),
+                ResearchTicks = 0, Requires = TechId.None, Civ = CivId.Woodlanders,
+            };
+            t[34] = new TechDef
+            {
+                Id = TechId.WoodlandersMarksmen, Key = "WoodlandersMarksmen", Name = "Marksmen",
+                Description = "Archers and longbowmen get +1 range in the Castle Age",
+                ResearchedAt = EntityKind.None, MinAge = AgeId.Castle, Cost = new Cost(0, 0, 0, 0),
+                ResearchTicks = 0, Requires = TechId.None, Civ = CivId.Woodlanders,
             };
             return t;
         }
@@ -796,6 +1065,62 @@ namespace Oduncu.Sim
                 new TechEffect(TechId.MeleeAttack2, EntityKind.None, EntityTag.Cavalry, StatId.Attack, EffectOp.Add, FP.FromInt(1)),
                 new TechEffect(TechId.MeleeAttack3, EntityKind.None, EntityTag.Infantry, StatId.Attack, EffectOp.Add, FP.FromInt(2)),
                 new TechEffect(TechId.MeleeAttack3, EntityKind.None, EntityTag.Cavalry, StatId.Attack, EffectOp.Add, FP.FromInt(2)),
+                new TechEffect(TechId.ArcherAttack1, EntityKind.None, EntityTag.Archer, StatId.Attack, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.ArcherAttack1, EntityKind.None, EntityTag.Shoots, StatId.Attack, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.ArcherAttack2, EntityKind.None, EntityTag.Archer, StatId.Attack, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.ArcherAttack2, EntityKind.None, EntityTag.Shoots, StatId.Attack, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.ArcherAttack3, EntityKind.None, EntityTag.Archer, StatId.Attack, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.ArcherAttack3, EntityKind.None, EntityTag.Shoots, StatId.Attack, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.InfantryArmor1, EntityKind.None, EntityTag.Infantry, StatId.MeleeArmor, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.InfantryArmor1, EntityKind.None, EntityTag.Infantry, StatId.PierceArmor, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.InfantryArmor2, EntityKind.None, EntityTag.Infantry, StatId.MeleeArmor, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.InfantryArmor2, EntityKind.None, EntityTag.Infantry, StatId.PierceArmor, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.InfantryArmor3, EntityKind.None, EntityTag.Infantry, StatId.MeleeArmor, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.InfantryArmor3, EntityKind.None, EntityTag.Infantry, StatId.PierceArmor, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.CavalryArmor1, EntityKind.None, EntityTag.Cavalry, StatId.MeleeArmor, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.CavalryArmor1, EntityKind.None, EntityTag.Cavalry, StatId.PierceArmor, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.CavalryArmor2, EntityKind.None, EntityTag.Cavalry, StatId.MeleeArmor, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.CavalryArmor2, EntityKind.None, EntityTag.Cavalry, StatId.PierceArmor, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.CavalryArmor3, EntityKind.None, EntityTag.Cavalry, StatId.MeleeArmor, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.CavalryArmor3, EntityKind.None, EntityTag.Cavalry, StatId.PierceArmor, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.ArcherArmor1, EntityKind.None, EntityTag.Archer, StatId.MeleeArmor, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.ArcherArmor1, EntityKind.None, EntityTag.Archer, StatId.PierceArmor, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.ArcherArmor2, EntityKind.None, EntityTag.Archer, StatId.MeleeArmor, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.ArcherArmor2, EntityKind.None, EntityTag.Archer, StatId.PierceArmor, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.ArcherArmor3, EntityKind.None, EntityTag.Archer, StatId.MeleeArmor, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.ArcherArmor3, EntityKind.None, EntityTag.Archer, StatId.PierceArmor, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.Woodcutting1, EntityKind.Tree, EntityTag.None, StatId.GatherRate, EffectOp.Multiply, FP.Ratio(12, 10)),
+                new TechEffect(TechId.Woodcutting2, EntityKind.Tree, EntityTag.None, StatId.GatherRate, EffectOp.Multiply, FP.Ratio(12, 10)),
+                new TechEffect(TechId.Farming1, EntityKind.Farm, EntityTag.None, StatId.GatherRate, EffectOp.Multiply, FP.Ratio(115, 100)),
+                new TechEffect(TechId.Farming2, EntityKind.Farm, EntityTag.None, StatId.GatherRate, EffectOp.Multiply, FP.Ratio(115, 100)),
+                new TechEffect(TechId.Farming2, EntityKind.Berries, EntityTag.None, StatId.GatherRate, EffectOp.Multiply, FP.Ratio(115, 100)),
+                new TechEffect(TechId.GoldMining1, EntityKind.GoldMine, EntityTag.None, StatId.GatherRate, EffectOp.Multiply, FP.Ratio(115, 100)),
+                new TechEffect(TechId.GoldMining2, EntityKind.GoldMine, EntityTag.None, StatId.GatherRate, EffectOp.Multiply, FP.Ratio(115, 100)),
+                new TechEffect(TechId.StoneMining1, EntityKind.StoneMine, EntityTag.None, StatId.GatherRate, EffectOp.Multiply, FP.Ratio(115, 100)),
+                new TechEffect(TechId.StoneMining2, EntityKind.StoneMine, EntityTag.None, StatId.GatherRate, EffectOp.Multiply, FP.Ratio(115, 100)),
+                new TechEffect(TechId.Loom, EntityKind.Villager, EntityTag.None, StatId.MaxHp, EffectOp.Add, FP.FromInt(15)),
+                new TechEffect(TechId.Loom, EntityKind.Villager, EntityTag.None, StatId.MeleeArmor, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.Loom, EntityKind.Villager, EntityTag.None, StatId.PierceArmor, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.Wheelbarrow, EntityKind.Villager, EntityTag.None, StatId.Speed, EffectOp.Multiply, FP.Ratio(11, 10)),
+                new TechEffect(TechId.Wheelbarrow, EntityKind.Villager, EntityTag.None, StatId.CarryCapacity, EffectOp.Add, FP.FromInt(3)),
+                new TechEffect(TechId.HandCart, EntityKind.Villager, EntityTag.None, StatId.Speed, EffectOp.Multiply, FP.Ratio(11, 10)),
+                new TechEffect(TechId.HandCart, EntityKind.Villager, EntityTag.None, StatId.CarryCapacity, EffectOp.Add, FP.FromInt(5)),
+                new TechEffect(TechId.TownWatch, EntityKind.None, EntityTag.Building, StatId.LineOfSight, EffectOp.Add, FP.FromInt(4)),
+                new TechEffect(TechId.Yeomen, EntityKind.Archer, EntityTag.None, StatId.Range, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.Yeomen, EntityKind.Crossbowman, EntityTag.None, StatId.Range, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.Yeomen, EntityKind.Arbalester, EntityTag.None, StatId.Range, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.Yeomen, EntityKind.Longbowman, EntityTag.None, StatId.Range, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.Yeomen, EntityKind.EliteLongbowman, EntityTag.None, StatId.Range, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.Warwolf, EntityKind.Trebuchet, EntityTag.None, StatId.Splash, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.Sanctity, EntityKind.Monk, EntityTag.None, StatId.MaxHp, EffectOp.Add, FP.FromInt(15)),
+                new TechEffect(TechId.Fervor, EntityKind.Monk, EntityTag.None, StatId.Speed, EffectOp.Multiply, FP.Ratio(115, 100)),
+                new TechEffect(TechId.WoodlandersCamps, EntityKind.LumberCamp, EntityTag.None, StatId.CostWood, EffectOp.Multiply, FP.Ratio(5, 10)),
+                new TechEffect(TechId.WoodlandersForestry, EntityKind.Tree, EntityTag.None, StatId.GatherRate, EffectOp.Multiply, FP.Ratio(115, 100)),
+                new TechEffect(TechId.WoodlandersMarksmen, EntityKind.Archer, EntityTag.None, StatId.Range, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.WoodlandersMarksmen, EntityKind.Crossbowman, EntityTag.None, StatId.Range, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.WoodlandersMarksmen, EntityKind.Arbalester, EntityTag.None, StatId.Range, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.WoodlandersMarksmen, EntityKind.Longbowman, EntityTag.None, StatId.Range, EffectOp.Add, FP.FromInt(1)),
+                new TechEffect(TechId.WoodlandersMarksmen, EntityKind.EliteLongbowman, EntityTag.None, StatId.Range, EffectOp.Add, FP.FromInt(1)),
             };
         }
 
@@ -824,7 +1149,7 @@ namespace Oduncu.Sim
             {
                 Id = AgeId.Imperial, Key = "Imperial", Name = "Imperial Age",
                 Cost = new Cost(800, 0, 500, 0), ResearchTicks = 900,
-                RequiredBuildings = 2, RequiredBuildingAge = AgeId.Castle, OrBuilding = EntityKind.None,
+                RequiredBuildings = 2, RequiredBuildingAge = AgeId.Castle, OrBuilding = EntityKind.Castle,
             };
             return t;
         }
