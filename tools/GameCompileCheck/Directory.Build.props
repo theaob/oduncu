@@ -8,7 +8,7 @@
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
     <!-- Must match the com.unity.inputsystem version in Oduncu.Unity/Packages/manifest.json. -->
-    <InputSystemVersion>1.14.2</InputSystemVersion>
+    <InputSystemVersion>1.20.1</InputSystemVersion>
     <InputSystemSource>$(MSBuildThisFileDirectory).cache/InputSystem-$(InputSystemVersion)/Packages/com.unity.inputsystem/InputSystem/</InputSystemSource>
     <UnityDefines>UNITY_2021_3_OR_NEWER;UNITY_2021_2_OR_NEWER;UNITY_2021_1_OR_NEWER;UNITY_2020_3_OR_NEWER;UNITY_2020_2_OR_NEWER;UNITY_2020_1_OR_NEWER;UNITY_2019_4_OR_NEWER;UNITY_2019_3_OR_NEWER;UNITY_2019_2_OR_NEWER;UNITY_2019_1_OR_NEWER;UNITY_ANDROID;ENABLE_INPUT_SYSTEM;ENABLE_LEGACY_INPUT_MANAGER</UnityDefines>
   </PropertyGroup>

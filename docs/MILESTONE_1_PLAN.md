@@ -259,7 +259,7 @@ CI proves the rules are right and deterministic. It cannot prove any of these:
 | Check | How | Pass mark |
 |---|---|---|
 | Milestone 0 baseline hash on two phones | Run `DeterminismProbe` on two Android devices of different chipsets. | Both print the README hash. **Entry gate for milestone 1.** |
-| Game scripts compile against real Unity | Open the project in Unity 6000.0.58f1. | No compile errors. (Tracked in the *Verify Unity scripts compile* thread.) |
+| Game scripts compile against real Unity | Open the project in Unity 6000.6.5f1. | No compile errors. (Tracked in the *Verify Unity scripts compile* thread.) |
 | Determinism on IL2CPP / ARM64 after the new systems | Re-run the probe with the milestone 1 determinism match on two devices. | Hashes match the headless suite. |
 | Simulation tick time | Debug overlay on a 2020 mid-range phone at full population. | Under 4 ms per tick (section 12.4). |
 | Frame rate and heat | 15-minute match on a mid-range and a 2018 low-end phone. | 60 fps mid-range, 30 fps floor low-end, Adaptive Performance kicks in under thermal warning. |

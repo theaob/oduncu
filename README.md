@@ -55,7 +55,7 @@ Ids in the tables are stored in command logs, so never renumber or reuse one.
 
 ## Opening in Unity
 
-1. Install any Unity 6000.0 LTS editor with the Android Build Support module.
+1. Install Unity 6000.6.5f1 with the Android Build Support module (the version in `ProjectSettings/ProjectVersion.txt`).
 2. Open `Oduncu.Unity/` from Unity Hub. On first open editor scripts create
    `Assets/Game/Scenes/Skirmish.unity`, add it to the build settings, set landscape
    orientation, and turn on both input handlers (the Input System drives the gestures).
@@ -81,7 +81,7 @@ tools/GameCompileCheck/check.sh
 This builds `Assets/Game/Scripts` and `Assets/Game/Editor` against Unity 2021.3 reference
 assemblies from NuGet and the Input System package's source (cloned at the version in
 `Packages/manifest.json`). It catches typos and wrong signatures; it cannot catch an API that
-exists in 2021.3 but changed in Unity 6, so opening the project in Unity remains the final check.
+exists in 2021.3 but changed in Unity 6000.6, so opening the project in Unity remains the final check.
 
 ## Determinism probe on a device
 

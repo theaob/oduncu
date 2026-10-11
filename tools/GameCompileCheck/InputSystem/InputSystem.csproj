@@ -9,8 +9,8 @@
   <ItemGroup>
     <!-- Editor code, uGUI and XR support need assemblies we do not have; the game does not use them. -->
     <Compile Include="$(InputSystemSource)**/*.cs"
-             Exclude="$(InputSystemSource)**/Editor/**;$(InputSystemSource)Plugins/UI/**;$(InputSystemSource)Plugins/XR/**" />
-    <Compile Include="$(InputSystemSource)Plugins/UI/UISupport.cs" />
+             Exclude="$(InputSystemSource)**/Editor/**;$(InputSystemSource)**/Plugins/UI/**;$(InputSystemSource)**/Plugins/XR/**" />
+    <Compile Include="$(InputSystemSource)**/Plugins/UI/UISupport.cs" />
     <Compile Include="InputSystemEditorStub.cs" />
   </ItemGroup>
 </Project>
