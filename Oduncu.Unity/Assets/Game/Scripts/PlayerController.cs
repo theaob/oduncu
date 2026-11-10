@@ -40,6 +40,9 @@ namespace Oduncu.Game
         /// <summary>Raised when the player's own building or unit loses hit points (for alerts).</summary>
         public event Action<Entity> OwnDamaged;
 
+        /// <summary>Raised when a tap gives an order with a place on the ground: where, and what kind (for the ping).</summary>
+        public event Action<Vector3, CommandKind> Ordered;
+
         private readonly List<int> _scratchIds = new List<int>(64);
         private readonly List<int> _builders = new List<int>(16);
         private readonly List<Cell> _wallCells = new List<Cell>(Simulation.MaxWallSegments);
@@ -162,6 +165,7 @@ namespace Oduncu.Game
                     {
                         if (hit != null && IsEnemy(hit)) _runner.Enqueue(Command.Attack(LocalPlayer, _scratchIds.ToArray(), hit.Id));
                         else _runner.Enqueue(Command.AttackMove(LocalPlayer, _scratchIds.ToArray(), cell));
+                        Ordered?.Invoke(OrderPoint(hit, ground), CommandKind.Attack);
                     }
                     CancelMode();
                     return;
@@ -172,6 +176,7 @@ namespace Oduncu.Game
                     {
                         _runner.Enqueue(Command.SetRally(LocalPlayer, building.Id, cell, hit != null && hit.Id != building.Id ? hit.Id : 0));
                         Toast?.Invoke("Rally point set.");
+                        Ordered?.Invoke(OrderPoint(null, ground), CommandKind.SetRally);
                     }
                     CancelMode();
                     return;
@@ -205,8 +210,18 @@ namespace Oduncu.Game
                 return;
             }
             Command order = SmartCommand(sim, hit, cell);
-            if (order != null) _runner.Enqueue(order);
+            if (order != null)
+            {
+                _runner.Enqueue(order);
+                Ordered?.Invoke(OrderPoint(order.Kind == CommandKind.Move ? null : hit, ground), order.Kind);
+            }
             else if (hit != null) Selection.Set(hit.Id);
+        }
+
+        /// <summary>Where an order's ping goes: the target's position, or the tapped ground.</summary>
+        private static Vector3 OrderPoint(Entity target, Vector3 ground)
+        {
+            return target == null ? new Vector3(ground.x, 0f, ground.z) : EntityPresenter.ToWorld(target);
         }
 
         /// <summary>The design's context command for a tap with own units selected, or null to select instead.</summary>

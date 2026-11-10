@@ -10,6 +10,14 @@ namespace Oduncu.Sim.AI
         Siege = 3,
     }
 
+    /// <summary>How hard the AI plays (design section 11). Both levels are fair: no extra resources, no map knowledge.</summary>
+    public enum Difficulty : byte
+    {
+        /// <summary>Slow build (it thinks every three seconds, keeps 22 villagers and at most 12 soldiers, researches nothing), no attacks before 8:00, never all in.</summary>
+        Easy = 0,
+        Standard = 1,
+    }
+
     /// <summary>
     /// The Standard AI (design section 11, plan 3.6). Fair: it gets no extra resources and no
     /// map knowledge. It reads its own entities and only the enemy entities its player can see
@@ -28,9 +36,19 @@ namespace Oduncu.Sim.AI
         /// <summary>From this tick (13 minutes) the AI throws everything at the enemy, so matches end.</summary>
         public const int AllInTick = 7800;
 
+        /// <summary>Easy: ticks between thinks, the first tick it may attack on, and its villager and army caps.</summary>
+        public const int EasyThinkInterval = 30;
+        public const int EasyFirstAttackTick = 4800;
+        public const int EasyVillagers = 22;
+        public const int EasyArmy = 12;
+
         private const int HomeRadius = 18;
 
         public readonly int Player;
+        public readonly Difficulty Difficulty;
+        private readonly int _thinkInterval;
+        private readonly int _firstAttackTick;
+        private readonly int _allInTick;
         public Strategy Strategy { get; private set; }
         /// <summary>Never attack, only defend: for economy tests and a sandbox opponent.</summary>
         public bool Peaceful { get; set; }
@@ -70,9 +88,14 @@ namespace Oduncu.Sim.AI
         private bool _needAgeBuildings;
         private const int AgeBuildingWood = 450;
 
-        public StandardAI(int player, ulong seed)
+        public StandardAI(int player, ulong seed, Difficulty difficulty = Difficulty.Standard)
         {
             Player = player;
+            Difficulty = difficulty;
+            bool easy = difficulty == Difficulty.Easy;
+            _thinkInterval = easy ? EasyThinkInterval : ThinkInterval;
+            _firstAttackTick = easy ? EasyFirstAttackTick : 0;
+            _allInTick = easy ? int.MaxValue : AllInTick;
             _rng = new DeterministicRandom(seed * 31UL + (ulong)player * 7919UL + 1UL);
             Strategy = (_rng.Next(2) == 0) ? Strategy.Boom : Strategy.Rush;
         }
@@ -81,12 +104,12 @@ namespace Oduncu.Sim.AI
         public void Think(Simulation sim, List<Command> output)
         {
             int tick = sim.CurrentTick + 1;
-            if ((tick + Player * 3) % ThinkInterval != 0) return;
+            if ((tick + Player * 3) % _thinkInterval != 0) return;
             if (!sim.Players[Player].Alive || sim.MatchOver) return;
 
             Survey(sim);
             _committed = Cost.Zero;
-            _allIn = tick >= AllInTick && !Peaceful;
+            _allIn = tick >= _allInTick && !Peaceful;
             if (_tc == null && _villagers.Count == 0 && _army.Count == 0) return;
             if (!_started) Start(sim, output);
             if (tick / StrategyInterval != _strategyPeriod)
@@ -235,7 +258,7 @@ namespace Oduncu.Sim.AI
             PlayerState me = sim.Players[Player];
             int myArmy = _army.Count;
             if (_threatId != 0 && !_lightThreat && myArmy < _enemyArmySeen) { Strategy = Strategy.Defend; return; }
-            if (me.Age >= AgeId.Castle && (_count[(int)EntityKind.SiegeWorkshop] > 0 || tick >= AllInTick))
+            if (me.Age >= AgeId.Castle && (_count[(int)EntityKind.SiegeWorkshop] > 0 || tick >= _allInTick))
             {
                 Strategy = Strategy.Siege;
                 return;
@@ -250,6 +273,8 @@ namespace Oduncu.Sim.AI
 
         private int VillagerTarget()
         {
+            // Easy runs a small economy and a small army and never researches, on top of thinking slowly.
+            if (Difficulty == Difficulty.Easy) return EasyVillagers;
             // All in: population goes to the army.
             if (_allIn) return 30;
             switch (Strategy)
@@ -687,7 +712,7 @@ namespace Oduncu.Sim.AI
         private bool Saving(Simulation sim, int tick)
         {
             PlayerState me = sim.Players[Player];
-            if ((_threatId != 0 && !_lightThreat) || tick >= AllInTick || !WantsToAge(sim, tick)) return false;
+            if ((_threatId != 0 && !_lightThreat) || tick >= _allInTick || !WantsToAge(sim, tick)) return false;
             if (IsAging()) return false;
             return sim.AgeUpRejection(Player) == null;
         }
@@ -713,7 +738,7 @@ namespace Oduncu.Sim.AI
         {
             PlayerState me = sim.Players[Player];
             int tick = sim.CurrentTick + 1;
-            if (Saving(sim, tick)) return;
+            if (Saving(sim, tick) || Difficulty == Difficulty.Easy) return;
             for (int i = 0; i < ResearchOrder.Length; i++)
             {
                 TechId tech = ResearchOrder[i];
@@ -735,9 +760,10 @@ namespace Oduncu.Sim.AI
         private void Production(Simulation sim, List<Command> output, int tick)
         {
             PlayerState me = sim.Players[Player];
-            bool boomQuiet = Strategy == Strategy.Boom && me.Age < AgeId.Castle && _threatId == 0 && tick < AllInTick;
+            bool boomQuiet = Strategy == Strategy.Boom && me.Age < AgeId.Castle && _threatId == 0 && tick < _allInTick;
             if (boomQuiet && _army.Count >= 4) return;
             if (Saving(sim, tick) && _threatId == 0) return;
+            if (Difficulty == Difficulty.Easy && _army.Count >= EasyArmy) return;
             for (int i = 0; i < _producers.Count; i++)
             {
                 Entity b = _producers[i];
@@ -780,8 +806,8 @@ namespace Oduncu.Sim.AI
 
         private int AttackThreshold(Simulation sim, int tick)
         {
-            if (Peaceful) return int.MaxValue;
-            if (tick >= AllInTick) return 1;
+            if (Peaceful || tick < _firstAttackTick) return int.MaxValue;
+            if (tick >= _allInTick) return 1;
             switch (Strategy)
             {
                 case Strategy.Rush: return 7;
@@ -809,7 +835,7 @@ namespace Oduncu.Sim.AI
 
             int threshold = AttackThreshold(sim, tick);
             if (!_attacking && _army.Count >= threshold) _attacking = true;
-            if (_attacking && _army.Count < System.Math.Max(1, threshold / 3) && tick < AllInTick) _attacking = false;
+            if (_attacking && _army.Count < System.Math.Max(1, threshold / 3) && tick < _allInTick) _attacking = false;
 
             if (!_attacking)
             {

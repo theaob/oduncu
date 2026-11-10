@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Text;
 using Oduncu.Sim;
+using Oduncu.Sim.AI;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -27,6 +28,20 @@ namespace Oduncu.Game
 
         private static readonly Color Panel = new Color(0.08f, 0.08f, 0.1f, 0.78f);
         private static readonly Color Scrim = new Color(0f, 0f, 0f, 0.7f);
+        private static readonly Color Muted = new Color(0.8f, 0.8f, 0.8f);
+        private static readonly Color AgeGold = new Color(0.9f, 0.85f, 0.6f);
+        /// <summary>Food, wood, gold, stone: the swatch beside each count, matching what villagers carry.</summary>
+        private static readonly Color[] ResourceColors =
+        {
+            new Color(0.86f, 0.3f, 0.26f), new Color(0.62f, 0.43f, 0.24f), new Color(0.98f, 0.8f, 0.2f), new Color(0.7f, 0.7f, 0.68f),
+        };
+        private static readonly string[] ResourceNames = { "Food", "Wood", "Gold", "Stone" };
+        private static readonly string[] DifficultyNames = { "Easy", "Standard" };
+        private static readonly string[] DifficultyBlurbs =
+        {
+            "Easy: builds slowly, keeps a small army and leaves you alone for the first 8 minutes.",
+            "Standard: a fair opponent. No extra resources, and it only knows what it has scouted.",
+        };
 
         private GameRoot _game;
         private SimRunner _runner;
@@ -40,8 +55,21 @@ namespace Oduncu.Game
         private VisualElement _root;
         private VisualElement _safe;
         private VisualElement _match;
-        private Label _resources;
+        private readonly Label[] _resLabels = new Label[4];
+        private readonly Label[] _resWorkers = new Label[4];
+        private readonly int[] _workers = new int[4];
+        private Label _pop;
+        private Label _clock;
         private Label _age;
+        private TapPad _speed;
+        private VisualElement _hpBack;
+        private VisualElement _hpFill;
+        private readonly TapPad[] _difficultyPads = new TapPad[2];
+        private Label _difficultyInfo;
+        private Label _pauseInfo;
+        private VisualElement _endTable;
+        private Difficulty _difficulty = Difficulty.Standard;
+        private float _nextWorkers;
         private Image _minimapImage;
         private TapPad _idle;
         private readonly TapPad[] _groups = new TapPad[Selection.GroupCount];
@@ -171,15 +199,53 @@ namespace Oduncu.Game
 
         public void ShowPause()
         {
+            SetText(_pauseInfo, Clock(_runner.Sim.CurrentTick) + "  ·  " + DifficultyNames[(int)_runner.Difficulty] + " AI");
             ShowOverlay(_pauseMenu);
         }
 
-        public void ShowEnd(bool won, int ticks)
+        public void ShowEnd(Simulation sim, bool won)
         {
             _endTitle.text = won ? "Victory" : "Defeat";
-            int seconds = ticks / SimConstants.TicksPerSecond;
-            _endInfo.text = "Match time " + (seconds / 60) + ":" + (seconds % 60).ToString("00");
+            _endTitle.style.color = won ? AgeGold : TapPad.ShortColor;
+            _endInfo.text = "Match time " + Clock(sim.MatchEndTick) + "  ·  " + DifficultyNames[(int)_runner.Difficulty] + " AI";
+
+            _endTable.Clear();
+            EndRow("", "Score", "Gathered", "Kills", "Losses", "Razed", "Buildings lost", true);
+            for (int p = 0; p < sim.Players.Length; p++)
+            {
+                MatchScore score = sim.Players[p].Score;
+                EndRow(p == _runner.LocalPlayer ? "You" : sim.Players.Length == 2 ? "Enemy" : "Player " + (p + 1),
+                    score.Total.ToString(), score.Gathered.ToString(), score.UnitsKilled.ToString(), score.UnitsLost.ToString(),
+                    score.BuildingsRazed.ToString(), score.BuildingsLost.ToString(), false);
+            }
             ShowOverlay(_endScreen);
+        }
+
+        private void EndRow(string name, string score, string gathered, string kills, string losses, string razed, string lost, bool header)
+        {
+            VisualElement row = Box(_endTable, FlexDirection.Row, false);
+            row.style.paddingTop = row.style.paddingBottom = 3;
+            Color color = header ? Muted : Color.white;
+            EndCell(row, name, 70, color, TextAnchor.MiddleLeft);
+            EndCell(row, score, 64, header ? Muted : AgeGold, TextAnchor.MiddleRight);
+            EndCell(row, gathered, 76, color, TextAnchor.MiddleRight);
+            EndCell(row, kills, 52, color, TextAnchor.MiddleRight);
+            EndCell(row, losses, 60, color, TextAnchor.MiddleRight);
+            EndCell(row, razed, 56, color, TextAnchor.MiddleRight);
+            EndCell(row, lost, 100, color, TextAnchor.MiddleRight);
+        }
+
+        private static void EndCell(VisualElement row, string text, float width, Color color, TextAnchor align)
+        {
+            Label l = Text(row, text, 13, color);
+            l.style.width = width;
+            l.style.unityTextAlign = align;
+        }
+
+        private static string Clock(int ticks)
+        {
+            int seconds = ticks / SimConstants.TicksPerSecond;
+            return (seconds / 60) + ":" + (seconds % 60).ToString("00");
         }
 
         private void ShowOverlay(VisualElement screen)
@@ -290,16 +356,39 @@ namespace Oduncu.Game
             VisualElement bar = Box(_match, FlexDirection.Row, true);
             Place(bar, left: 0, top: 0);
             bar.style.backgroundColor = Panel;
-            bar.style.height = 44;
+            bar.style.height = 48;
             bar.style.alignItems = Align.Center;
             bar.style.paddingLeft = 8;
             bar.style.paddingRight = 4;
             TapPad.SetRadius(bar, 6);
-            _resources = Text(bar, "", 15, Color.white);
-            _resources.style.marginRight = 10;
-            _age = Text(bar, "", 13, new Color(0.9f, 0.85f, 0.6f));
-            _age.style.marginRight = 6;
-            Pad(bar, "Planner", TogglePlanner, 72, 48);
+            for (int r = 0; r < 4; r++)
+            {
+                // Swatch, stockpile, and under it how many villagers are on that resource.
+                VisualElement chip = Box(bar, FlexDirection.Row, false);
+                chip.style.alignItems = Align.Center;
+                chip.style.marginRight = 8;
+                var swatch = new VisualElement { pickingMode = PickingMode.Ignore };
+                swatch.style.width = swatch.style.height = 12;
+                swatch.style.marginRight = 5;
+                swatch.style.backgroundColor = ResourceColors[r];
+                TapPad.SetRadius(swatch, 3);
+                chip.Add(swatch);
+                VisualElement numbers = Box(chip, FlexDirection.Column, false);
+                numbers.style.minWidth = 34;
+                _resLabels[r] = Text(numbers, "0", 15, Color.white);
+                _resLabels[r].style.unityFontStyleAndWeight = FontStyle.Bold;
+                _resWorkers[r] = Text(numbers, "", 10, Muted);
+            }
+            VisualElement pop = Box(bar, FlexDirection.Column, false);
+            pop.style.marginRight = 10;
+            _pop = Text(pop, "", 15, Color.white);
+            _pop.style.unityFontStyleAndWeight = FontStyle.Bold;
+            Text(pop, "population", 10, Muted);
+            VisualElement when = Box(bar, FlexDirection.Column, false);
+            when.style.marginRight = 6;
+            _age = Text(when, "", 13, AgeGold);
+            _clock = Text(when, "", 11, Muted);
+            Pad(bar, "Planner", TogglePlanner, 64, 48);
         }
 
         private void BuildTopRight()
@@ -322,7 +411,23 @@ namespace Oduncu.Game
             });
             frame.Add(_minimapImage);
 
-            Pad(corner, "Menu", () => _game.Pause(), 56, 48);
+            VisualElement buttons = Box(corner, FlexDirection.Column, false);
+            Pad(buttons, "Menu", () => _game.Pause(), 56, 48);
+            _speed = Pad(buttons, "1x", ToggleSpeed, 56, 48);
+            _speed.Set("1x", "speed", true, false, false);
+        }
+
+        private void ToggleSpeed()
+        {
+            _runner.Speed = _runner.Speed >= 2 ? 1 : 2;
+            RefreshSpeed();
+        }
+
+        private void RefreshSpeed()
+        {
+            bool fast = _runner.Speed >= 2;
+            _speed.Set(fast ? "2x" : "1x", "speed", true, false, false);
+            _speed.Selected = fast;
         }
 
         private void BuildQuickSelect()
@@ -354,6 +459,17 @@ namespace Oduncu.Game
             TapPad.SetRadius(_selectionPanel, 6);
             _selTitle = Text(_selectionPanel, "", 15, Color.white);
             _selTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
+            _hpBack = new VisualElement { pickingMode = PickingMode.Ignore };
+            _hpBack.style.height = 6;
+            _hpBack.style.marginTop = 3;
+            _hpBack.style.marginBottom = 3;
+            _hpBack.style.backgroundColor = new Color(0f, 0f, 0f, 0.6f);
+            TapPad.SetRadius(_hpBack, 3);
+            _hpFill = new VisualElement { pickingMode = PickingMode.Ignore };
+            _hpFill.style.height = 6;
+            TapPad.SetRadius(_hpFill, 3);
+            _hpBack.Add(_hpFill);
+            _selectionPanel.Add(_hpBack);
             _selInfo = Text(_selectionPanel, "", 12, new Color(0.85f, 0.85f, 0.85f));
             _selInfo.style.whiteSpace = WhiteSpace.Normal;
             _queueRow = Box(_selectionPanel, FlexDirection.Row, false);
@@ -438,12 +554,28 @@ namespace Oduncu.Game
 
             _mainMenu = MenuColumn();
             Text(_mainMenu, "Oduncu", 40, Color.white).style.unityFontStyleAndWeight = FontStyle.Bold;
-            Text(_mainMenu, "Milestone 1 vertical slice", 13, new Color(0.8f, 0.8f, 0.8f)).style.marginBottom = 16;
-            Pad(_mainMenu, "Skirmish vs Standard AI", () => _game.StartSkirmish(), 260, 56);
+            Text(_mainMenu, "Skirmish on the Open map", 13, Muted).style.marginBottom = 16;
+            Text(_mainMenu, "Opponent", 12, Muted);
+            VisualElement levels = Box(_mainMenu, FlexDirection.Row, false);
+            for (int d = 0; d < _difficultyPads.Length; d++)
+            {
+                var level = (Difficulty)d;
+                _difficultyPads[d] = Pad(levels, DifficultyNames[d], () => SetDifficulty(level), 128, 52);
+            }
+            _difficultyInfo = Text(_mainMenu, "", 12, Muted);
+            _difficultyInfo.style.whiteSpace = WhiteSpace.Normal;
+            _difficultyInfo.style.unityTextAlign = TextAnchor.MiddleCenter;
+            _difficultyInfo.style.width = 300;
+            _difficultyInfo.style.marginTop = 4;
+            _difficultyInfo.style.marginBottom = 14;
+            Pad(_mainMenu, "Start skirmish", () => _game.StartSkirmish(_difficulty), 260, 56).Selected = true;
+            SetDifficulty(_difficulty);
 
             _pauseMenu = MenuColumn();
-            Text(_pauseMenu, "Paused", 30, Color.white).style.marginBottom = 12;
-            Pad(_pauseMenu, "Resume", () => _game.Resume(), 220, 52);
+            Text(_pauseMenu, "Paused", 30, Color.white);
+            _pauseInfo = Text(_pauseMenu, "", 13, Muted);
+            _pauseInfo.style.marginBottom = 12;
+            Pad(_pauseMenu, "Resume", () => _game.Resume(), 220, 52).Selected = true;
             Pad(_pauseMenu, "Restart", () => _game.Restart(), 220, 52);
             Pad(_pauseMenu, "Quit to menu", () => _game.QuitToMenu(), 220, 52);
 
@@ -451,9 +583,22 @@ namespace Oduncu.Game
             _endTitle = Text(_endScreen, "", 36, Color.white);
             _endTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
             _endInfo = Text(_endScreen, "", 14, new Color(0.85f, 0.85f, 0.85f));
-            _endInfo.style.marginBottom = 12;
-            Pad(_endScreen, "Rematch", () => _game.Restart(), 220, 52);
+            _endInfo.style.marginBottom = 10;
+            _endTable = Box(_endScreen, FlexDirection.Column, false);
+            _endTable.style.backgroundColor = Panel;
+            _endTable.style.paddingLeft = _endTable.style.paddingRight = 12;
+            _endTable.style.paddingTop = _endTable.style.paddingBottom = 6;
+            _endTable.style.marginBottom = 12;
+            TapPad.SetRadius(_endTable, 8);
+            Pad(_endScreen, "Rematch", () => _game.Restart(), 220, 52).Selected = true;
             Pad(_endScreen, "Back to menu", () => _game.QuitToMenu(), 220, 52);
+        }
+
+        private void SetDifficulty(Difficulty level)
+        {
+            _difficulty = level;
+            for (int d = 0; d < _difficultyPads.Length; d++) _difficultyPads[d].Selected = d == (int)level;
+            SetText(_difficultyInfo, DifficultyBlurbs[(int)level]);
         }
 
         private VisualElement MenuColumn()
@@ -539,12 +684,21 @@ namespace Oduncu.Game
         private void RefreshTopBar(Simulation sim)
         {
             PlayerState p = sim.Players[_runner.LocalPlayer];
-            _sb.Clear();
-            _sb.Append("F ").Append(p.Food).Append("   W ").Append(p.Wood).Append("   G ").Append(p.Gold)
-               .Append("   S ").Append(p.Stone).Append("   Pop ").Append(p.Population).Append('/').Append(p.PopulationCap);
-            SetText(_resources, _sb.ToString());
+            bool housed = p.Population >= p.PopulationCap && p.PopulationCap < SimConstants.MaxPopulation;
+            SetText(_resLabels[0], p.Food.ToString());
+            SetText(_resLabels[1], p.Wood.ToString());
+            SetText(_resLabels[2], p.Gold.ToString());
+            SetText(_resLabels[3], p.Stone.ToString());
+            SetText(_pop, p.Population + "/" + p.PopulationCap);
+            _pop.style.color = housed ? TapPad.ShortColor : Color.white;
             SetText(_age, GameData.Ages[(int)p.Age].Name);
-            _resources.style.color = p.Population >= p.PopulationCap && p.PopulationCap < SimConstants.MaxPopulation ? TapPad.ShortColor : Color.white;
+            SetText(_clock, Clock(sim.CurrentTick));
+            if (Time.unscaledTime >= _nextWorkers)
+            {
+                _nextWorkers = Time.unscaledTime + 0.5f;
+                CountWorkers(sim);
+                for (int r = 0; r < 4; r++) SetText(_resWorkers[r], _workers[r] > 0 ? _workers[r] + " vil" : "");
+            }
 
             int idle = _player.IdleVillagerCount();
             _idle.Set("Idle", idle > 0 ? idle.ToString() : "", true, false, idle > 0);
@@ -562,6 +716,37 @@ namespace Oduncu.Game
                     ? "Off: villagers keep their jobs. Drag the split or pick a preset to have new and idle villagers fill the gaps."
                     : "On: new and idle villagers go where the split is furthest behind.");
                 if (p.Age != _lastAge) RebuildPresets(p.Age);
+            }
+        }
+
+        /// <summary>How many of the local player's villagers are gathering each resource.</summary>
+        private void CountWorkers(Simulation sim)
+        {
+            for (int r = 0; r < 4; r++) _workers[r] = 0;
+            int me = _runner.LocalPlayer;
+            IReadOnlyList<Entity> entities = sim.Entities;
+            for (int i = 0; i < entities.Count; i++)
+            {
+                Entity e = entities[i];
+                if (!e.Alive || e.Owner != me || !e.IsUnit) continue;
+                ResourceKind kind;
+                if (e.State == UnitState.Gathering && e.GatherKind != EntityKind.None) kind = EntityDefs.Get(e.GatherKind).Yields;
+                else if (e.State == UnitState.Returning) kind = e.CarryKind;
+                else continue;
+                int slot = ResourceSlot(kind);
+                if (slot >= 0) _workers[slot]++;
+            }
+        }
+
+        private static int ResourceSlot(ResourceKind kind)
+        {
+            switch (kind)
+            {
+                case ResourceKind.Food: return 0;
+                case ResourceKind.Wood: return 1;
+                case ResourceKind.Gold: return 2;
+                case ResourceKind.Stone: return 3;
+                default: return -1;
             }
         }
 
@@ -598,10 +783,19 @@ namespace Oduncu.Game
                 }
                 SetText(_selInfo, _sb.ToString());
                 _queueRow.style.display = DisplayStyle.None;
+                _hpBack.style.display = DisplayStyle.None;
                 return;
             }
 
             EntityDef def = primary.Def;
+            bool hasHp = !primary.IsResource && primary.State != UnitState.Carcass && primary.Stats.MaxHp > 0;
+            _hpBack.style.display = hasHp ? DisplayStyle.Flex : DisplayStyle.None;
+            if (hasHp)
+            {
+                float f = Mathf.Clamp01(primary.Hp / (float)primary.Stats.MaxHp);
+                _hpFill.style.width = Length.Percent(f * 100f);
+                _hpFill.style.backgroundColor = f > 0.6f ? PlaceholderArt.HealthHigh : f > 0.3f ? PlaceholderArt.HealthMid : PlaceholderArt.HealthLow;
+            }
             SetText(_selTitle, def.Name + (primary.Owner >= 0 && primary.Owner != me ? " (enemy)" : ""));
             _sb.Clear();
             if (primary.IsResource || def.IsGatherable)
@@ -756,6 +950,8 @@ namespace Oduncu.Game
             _housedShown = false;
             _lastAttackAlert = -100f;
             _planner.style.display = DisplayStyle.None;
+            _nextWorkers = 0f;
+            RefreshSpeed();
             RebuildPresets(_lastAge);
         }
 

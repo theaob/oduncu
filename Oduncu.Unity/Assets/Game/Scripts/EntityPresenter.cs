@@ -27,10 +27,29 @@ namespace Oduncu.Game
         private readonly List<Transform> _projectiles = new List<Transform>();
         private int _selectionVersion = -1;
 
-        public void Init(SimRunner runner, Selection selection)
+        private const float PingSeconds = 0.45f;
+        private const float AttackPulseSeconds = 0.22f;
+        private static readonly Color MovePing = new Color(0.4f, 1f, 0.5f, 0.7f);
+        private static readonly Color AttackPing = new Color(1f, 0.35f, 0.3f, 0.7f);
+        private static readonly Color WorkPing = new Color(1f, 0.9f, 0.4f, 0.7f);
+
+        private struct Ping
+        {
+            public Transform Transform;
+            public Renderer Renderer;
+            public float Left;
+        }
+
+        private Camera _camera;
+        private readonly List<Ping> _pings = new List<Ping>(8);
+        private GameObject _flag;
+        private bool _overlays = true;
+
+        public void Init(SimRunner runner, Selection selection, Camera cam)
         {
             _runner = runner;
             _selection = selection;
+            _camera = cam;
             _runner.Ticked += OnTicked;
             _runner.MatchStarted += OnMatchStarted;
         }
@@ -52,7 +71,39 @@ namespace Oduncu.Game
             _dying.Clear();
             _ringed.Clear();
             _projectiles.Clear();
+            _pings.Clear();
+            _flag = null;
             _selectionVersion = -1;
+        }
+
+        /// <summary>Flash a shrinking disc on the ground where an order was given.</summary>
+        public void ShowOrder(Vector3 world, CommandKind kind)
+        {
+            if (_root == null) return;
+            Color color = kind == CommandKind.Attack || kind == CommandKind.AttackMove ? AttackPing
+                : kind == CommandKind.Move || kind == CommandKind.SetRally ? MovePing : WorkPing;
+            Material material = PlaceholderArt.UnlitMaterial(color);
+            if (material == null) return;
+            int slot = -1;
+            for (int i = 0; i < _pings.Count; i++)
+            {
+                if (_pings[i].Left <= 0f) { slot = i; break; }
+            }
+            Ping ping;
+            if (slot < 0)
+            {
+                GameObject go = PlaceholderArt.BuildPing(_root, color);
+                if (go == null) return;
+                ping = new Ping { Transform = go.transform, Renderer = go.GetComponent<Renderer>() };
+                slot = _pings.Count;
+                _pings.Add(ping);
+            }
+            ping = _pings[slot];
+            ping.Left = PingSeconds;
+            ping.Renderer.sharedMaterial = material;
+            ping.Transform.position = new Vector3(world.x, 0.03f, world.z);
+            ping.Transform.gameObject.SetActive(true);
+            _pings[slot] = ping;
         }
 
         private void OnMatchStarted(Simulation sim)
@@ -84,9 +135,11 @@ namespace Oduncu.Game
                     _views.Add(e.Id, view);
                     view.PreviousPosition = view.CurrentPosition = ToWorld(e);
                     view.transform.position = view.CurrentPosition;
+                    view.LastCooldown = e.Cooldown;
                     if (_selection.Contains(e.Id))
                     {
                         view.SelectionRing.SetActive(true);
+                        view.Selected = true;
                         _ringed.Add(e.Id);
                     }
                 }
@@ -95,6 +148,13 @@ namespace Oduncu.Game
                     view.PreviousPosition = view.CurrentPosition;
                     view.CurrentPosition = ToWorld(e);
                 }
+                view.State = e.State;
+                view.Moving = (view.CurrentPosition - view.PreviousPosition).sqrMagnitude > 0.00001f;
+                // The cooldown jumps up on the tick a unit or building strikes or shoots.
+                if (e.Cooldown > view.LastCooldown && e.State != UnitState.Healing) view.AttackPulse = AttackPulseSeconds;
+                view.LastCooldown = e.Cooldown;
+                int maxHp = e.Stats.MaxHp;
+                view.HpFraction = e.IsResource || maxHp <= 0 ? 1f : Mathf.Clamp01(e.Hp / (float)maxHp);
                 UpdateShape(e, view);
             }
 
@@ -114,6 +174,8 @@ namespace Oduncu.Game
                 {
                     view.Dying = DeathSeconds;
                     if (view.SelectionRing != null) view.SelectionRing.SetActive(false);
+                    if (view.HealthBar != null) view.HealthBar.gameObject.SetActive(false);
+                    if (view.Fire != null) view.Fire.SetActive(false);
                     _dying.Add(view);
                 }
                 else
@@ -126,8 +188,20 @@ namespace Oduncu.Game
         private static void UpdateShape(Entity e, EntityView view)
         {
             if (view.Model == null) return;
+            if (view.CarryPack != null)
+            {
+                bool loaded = e.Carry > 0;
+                GameObject pack = view.CarryPack.gameObject;
+                if (pack.activeSelf != loaded) pack.SetActive(loaded);
+                if (loaded) view.CarryPack.sharedMaterial = PlaceholderArt.MaterialFor(PlaceholderArt.CarryColor(e.CarryKind));
+            }
             if (e.IsBuilding)
             {
+                // Buildings under half health burn until repaired.
+                bool burning = !e.UnderConstruction && view.HpFraction < 0.5f && e.Kind != EntityKind.Farm;
+                if (burning && view.Fire == null) view.Fire = PlaceholderArt.AddFire(view, e.Def.Size);
+                if (view.Fire != null && view.Fire.activeSelf != burning) view.Fire.SetActive(burning);
+
                 int buildTicks = e.Stats.BuildTicks;
                 float progress = e.UnderConstruction && buildTicks > 0 ? Mathf.Clamp01(e.BuildProgress / (float)buildTicks) : 1f;
                 Vector3 s = view.Model.localScale;
@@ -151,15 +225,138 @@ namespace Oduncu.Game
                 Vector3 step = view.CurrentPosition - view.PreviousPosition;
                 Transform t = view.transform;
                 t.position = p;
-                if (step.sqrMagnitude > 0.0001f && EntityDefs.Get(view.Kind).IsUnit)
+                if (step.sqrMagnitude > 0.0001f && view.IsUnit)
                 {
                     t.rotation = Quaternion.Slerp(t.rotation, Quaternion.LookRotation(step, Vector3.up), turn);
                 }
+                Animate(view);
+                UpdateHealthBar(view);
             }
 
             UpdateDying();
+            UpdatePings();
             UpdateSelectionRings();
+            UpdateRallyFlag(_runner.Sim);
             UpdateProjectiles(_runner.Sim, a);
+        }
+
+        /// <summary>
+        /// Placeholder animation from simulation state alone: walkers bob, workers lean into
+        /// their swing, attackers lunge (buildings recoil), fires flicker.
+        /// </summary>
+        private static void Animate(EntityView view)
+        {
+            Transform model = view.Model;
+            if (model == null) return;
+            float time = Time.time;
+            if (view.AttackPulse > 0f) view.AttackPulse -= Time.deltaTime;
+            float pulse = view.AttackPulse > 0f ? Mathf.Sin(Mathf.PI * (1f - view.AttackPulse / AttackPulseSeconds)) : 0f;
+
+            if (!view.IsUnit)
+            {
+                if (view.Fire != null && view.Fire.activeSelf)
+                {
+                    Transform fire = view.Fire.transform;
+                    for (int i = 0; i < fire.childCount; i++)
+                    {
+                        Transform flame = fire.GetChild(i);
+                        float k = 0.5f + 0.5f * Mathf.Sin(time * (7f + i) + view.Phase + i * 1.7f);
+                        Vector3 s = flame.localScale;
+                        // Even children are flames (stretch), odd are smoke (swell).
+                        if ((i & 1) == 0) s.y = 0.35f + 0.35f * k;
+                        else s.x = s.z = 0.28f + 0.14f * k;
+                        flame.localScale = s;
+                    }
+                }
+                return;
+            }
+            if (view.State == UnitState.Carcass) return;
+
+            float y = 0f, z = 0f, lean = 0f;
+            if (view.Rigid)
+            {
+                // Siege engines kick back when they fire.
+                z = -0.12f * pulse;
+            }
+            else
+            {
+                if (view.Moving) y = Mathf.Abs(Mathf.Sin(time * 11f + view.Phase)) * 0.07f;
+                bool working = view.State == UnitState.Gathering || view.State == UnitState.Building || view.State == UnitState.Repairing;
+                if (working && !view.Moving) lean = 22f * Mathf.Max(0f, Mathf.Sin(time * 7f + view.Phase));
+                z = 0.18f * pulse;
+                lean += 14f * pulse;
+            }
+            model.localPosition = new Vector3(0f, y, z);
+            model.localRotation = Quaternion.Euler(lean, 0f, 0f);
+        }
+
+        /// <summary>A bar over anything of a player's that is selected or hurt, turned to face the camera.</summary>
+        private void UpdateHealthBar(EntityView view)
+        {
+            bool show = _overlays && view.Owner >= 0 && view.State != UnitState.Carcass
+                && (view.HpFraction < 0.999f || (view.Selected && view.IsUnit));
+            if (!show)
+            {
+                if (view.HealthBar != null && view.HealthBar.gameObject.activeSelf) view.HealthBar.gameObject.SetActive(false);
+                return;
+            }
+            if (view.HealthBar == null && !PlaceholderArt.AddHealthBar(view))
+            {
+                _overlays = false;
+                return;
+            }
+            if (!view.HealthBar.gameObject.activeSelf) view.HealthBar.gameObject.SetActive(true);
+            if (_camera != null) view.HealthBar.rotation = _camera.transform.rotation;
+            float f = Mathf.Max(0.02f, view.HpFraction);
+            Vector3 s = view.HealthFill.localScale;
+            if (Mathf.Abs(s.x - view.BarWidth * f) > 0.001f)
+            {
+                s.x = view.BarWidth * f;
+                view.HealthFill.localScale = s;
+                view.HealthFill.localPosition = new Vector3(-view.BarWidth * (1f - f) * 0.5f, 0f, -0.01f);
+                Color c = f > 0.6f ? PlaceholderArt.HealthHigh : f > 0.3f ? PlaceholderArt.HealthMid : PlaceholderArt.HealthLow;
+                Material m = PlaceholderArt.UnlitMaterial(c);
+                if (m != null) view.HealthFillRenderer.sharedMaterial = m;
+            }
+        }
+
+        private void UpdatePings()
+        {
+            for (int i = 0; i < _pings.Count; i++)
+            {
+                Ping ping = _pings[i];
+                if (ping.Left <= 0f) continue;
+                ping.Left -= Time.deltaTime;
+                if (ping.Left <= 0f)
+                {
+                    ping.Transform.gameObject.SetActive(false);
+                }
+                else
+                {
+                    // Start wide and close in on the point.
+                    float d = 0.3f + 1.3f * (ping.Left / PingSeconds);
+                    ping.Transform.localScale = new Vector3(d, 0.01f, d);
+                }
+                _pings[i] = ping;
+            }
+        }
+
+        /// <summary>A flag at the rally point of the selected building, while it is selected.</summary>
+        private void UpdateRallyFlag(Simulation sim)
+        {
+            Entity b = _selection.Count == 1 ? _selection.Primary(sim) : null;
+            bool show = b != null && b.IsBuilding && b.Owner == _runner.LocalPlayer && b.HasRally;
+            if (!show)
+            {
+                if (_flag != null && _flag.activeSelf) _flag.SetActive(false);
+                return;
+            }
+            if (_flag == null) _flag = PlaceholderArt.BuildFlag(_root, PlaceholderArt.PlayerColor(b.Owner));
+            if (!_flag.activeSelf) _flag.SetActive(true);
+            Vector3 at = new Vector3(b.RallyCell.X + 0.5f, 0f, b.RallyCell.Y + 0.5f);
+            Entity target = b.RallyTargetId != 0 ? sim.Find(b.RallyTargetId) : null;
+            if (target != null && target.Alive) at = ToWorld(target);
+            _flag.transform.position = at;
         }
 
         private void UpdateDying()
@@ -191,7 +388,11 @@ namespace Oduncu.Game
             for (int i = 0; i < _ringed.Count; i++)
             {
                 EntityView old;
-                if (_views.TryGetValue(_ringed[i], out old) && old.SelectionRing != null) old.SelectionRing.SetActive(false);
+                if (_views.TryGetValue(_ringed[i], out old))
+                {
+                    old.Selected = false;
+                    if (old.SelectionRing != null) old.SelectionRing.SetActive(false);
+                }
             }
             _ringed.Clear();
             IReadOnlyList<int> ids = _selection.Ids;
@@ -200,6 +401,7 @@ namespace Oduncu.Game
                 EntityView view;
                 if (!_views.TryGetValue(ids[i], out view) || view.SelectionRing == null) continue;
                 view.SelectionRing.SetActive(true);
+                view.Selected = true;
                 _ringed.Add(ids[i]);
             }
         }

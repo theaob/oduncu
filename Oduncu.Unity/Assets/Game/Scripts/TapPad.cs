@@ -16,6 +16,7 @@ namespace Oduncu.Game
 
         public static readonly Color Normal = new Color(0.12f, 0.12f, 0.14f, 0.82f);
         public static readonly Color Pressed = new Color(0.32f, 0.32f, 0.36f, 0.95f);
+        public static readonly Color SelectedTint = new Color(0.16f, 0.36f, 0.62f, 0.95f);
         public static readonly Color AlertTint = new Color(0.7f, 0.45f, 0.1f, 0.9f);
         public static readonly Color ShortColor = new Color(1f, 0.45f, 0.4f);
         public static readonly Color DetailColor = new Color(0.8f, 0.8f, 0.8f);
@@ -28,6 +29,18 @@ namespace Oduncu.Game
         private float _downAt = -1f;
         private bool _alert;
         private bool _active = true;
+        private bool _selected;
+
+        /// <summary>Marks the chosen option in a group (menu difficulty, game speed).</summary>
+        public bool Selected
+        {
+            get => _selected;
+            set
+            {
+                _selected = value;
+                if (_downAt < 0f) style.backgroundColor = Rest();
+            }
+        }
 
         public TapPad(string title, float width = 64f, float height = 56f)
         {
@@ -89,7 +102,7 @@ namespace Oduncu.Game
         private Color Rest()
         {
             if (_alert && Mathf.Repeat(Time.unscaledTime, 1f) < 0.5f) return AlertTint;
-            return Normal;
+            return _selected ? SelectedTint : Normal;
         }
 
         private void OnDown(PointerDownEvent evt)

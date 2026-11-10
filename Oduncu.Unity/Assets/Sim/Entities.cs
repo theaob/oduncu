@@ -246,6 +246,29 @@ namespace Oduncu.Sim
         }
     }
 
+    /// <summary>Running match totals for one player, shown on the end screen.</summary>
+    public struct MatchScore
+    {
+        public int UnitsKilled;
+        public int UnitsLost;
+        public int BuildingsRazed;
+        public int BuildingsLost;
+        /// <summary>Resources villagers have dropped off, all kinds together.</summary>
+        public int Gathered;
+
+        /// <summary>One number for the end screen: economy plus fighting.</summary>
+        public int Total => Gathered / 10 + UnitsKilled * 20 + BuildingsRazed * 50;
+
+        public void WriteState(StateHasher h)
+        {
+            h.Write(UnitsKilled);
+            h.Write(UnitsLost);
+            h.Write(BuildingsRazed);
+            h.Write(BuildingsLost);
+            h.Write(Gathered);
+        }
+    }
+
     public sealed class PlayerState
     {
         private static readonly string[] NotEnough = { "not enough food", "not enough wood", "not enough gold", "not enough stone" };
@@ -267,6 +290,7 @@ namespace Oduncu.Sim
         public EconomyTargets EconomyTargets = EconomyTargets.Off;
         /// <summary>Stats for every entity kind with this player's researched upgrades applied.</summary>
         public readonly PlayerStats Stats = new PlayerStats();
+        public MatchScore Score;
 
         public int Get(ResourceKind kind)
         {
@@ -342,6 +366,7 @@ namespace Oduncu.Sim
             h.Write(HadConquestBuilding);
             EconomyTargets.WriteState(h);
             Stats.WriteState(h);
+            Score.WriteState(h);
         }
     }
 }

@@ -95,7 +95,7 @@ namespace Oduncu.Sim
         {
             if (!attacker.Def.IsRanged)
             {
-                DealDamage(attacker.Id, target, DamageAgainst(attacker.Kind, attacker.Stats.Attack, attacker.Def.AttackType, target));
+                DealDamage(attacker.Id, attacker.Owner, target, DamageAgainst(attacker.Kind, attacker.Stats.Attack, attacker.Def.AttackType, target));
                 return;
             }
             Launch(attacker, target);
@@ -152,7 +152,7 @@ namespace Oduncu.Sim
             if (p.Splash <= FP.Zero)
             {
                 Entity target = Find(p.TargetId);
-                if (IsAttackable(target)) DealDamage(p.AttackerId, target, DamageAgainst(p.AttackerKind, p.Attack, p.Type, target));
+                if (IsAttackable(target)) DealDamage(p.AttackerId, p.Owner, target, DamageAgainst(p.AttackerKind, p.Attack, p.Type, target));
                 return;
             }
 
@@ -162,7 +162,7 @@ namespace Oduncu.Sim
             for (int i = 0; i < hits.Count; i++)
             {
                 Entity e = hits[i];
-                if (e.Alive && IsAttackable(e)) DealDamage(p.AttackerId, e, DamageAgainst(p.AttackerKind, p.Attack, p.Type, e));
+                if (e.Alive && IsAttackable(e)) DealDamage(p.AttackerId, p.Owner, e, DamageAgainst(p.AttackerKind, p.Attack, p.Type, e));
             }
             hits.Clear();
         }
@@ -200,13 +200,32 @@ namespace Oduncu.Sim
         }
 
         /// <summary>Apply damage, remember who did it, and kill or (for animals) turn into a carcass.</summary>
-        private void DealDamage(int attackerId, Entity target, int damage)
+        private void DealDamage(int attackerId, int attackerOwner, Entity target, int damage)
         {
             target.Hp -= damage;
             target.LastAttackerId = attackerId;
             if (target.Hp > 0) return;
-            if (target.IsUnit && target.Def.IsAnimal) MakeCarcass(target);
-            else Kill(target);
+            if (target.IsUnit && target.Def.IsAnimal)
+            {
+                MakeCarcass(target);
+                return;
+            }
+            RecordKill(attackerOwner, target);
+            Kill(target);
+        }
+
+        /// <summary>Credit a kill to the match scores (the end screen reads them). Friendly fire counts as a loss only.</summary>
+        private void RecordKill(int attackerOwner, Entity target)
+        {
+            if (!target.Alive || target.Owner < 0) return;
+            bool building = target.IsBuilding;
+            PlayerState loser = Players[target.Owner];
+            if (building) loser.Score.BuildingsLost++;
+            else loser.Score.UnitsLost++;
+            if (attackerOwner < 0 || attackerOwner == target.Owner) return;
+            PlayerState killer = Players[attackerOwner];
+            if (building) killer.Score.BuildingsRazed++;
+            else killer.Score.UnitsKilled++;
         }
 
         /// <summary>A dead animal stays on the map as neutral food until it is gathered out.</summary>

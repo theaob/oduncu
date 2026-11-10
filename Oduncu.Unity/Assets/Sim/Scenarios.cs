@@ -35,10 +35,11 @@ namespace Oduncu.Sim
         }
 
         /// <summary>Play an AI against AI match until conquest or the tick limit. Returns the final tick.</summary>
-        public static int RunMatch(Simulation sim, int maxTicks, CommandLog log = null)
+        public static int RunMatch(Simulation sim, int maxTicks, CommandLog log = null, AI.Difficulty[] difficulties = null)
         {
             var ais = new AI.StandardAI[sim.Players.Length];
-            for (int p = 0; p < ais.Length; p++) ais[p] = new AI.StandardAI(p, sim.Rng.State);
+            for (int p = 0; p < ais.Length; p++)
+                ais[p] = new AI.StandardAI(p, sim.Rng.State, difficulties != null ? difficulties[p] : AI.Difficulty.Standard);
             var commands = new List<Command>();
             while (!sim.MatchOver && sim.CurrentTick < maxTicks)
             {
