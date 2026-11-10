@@ -25,6 +25,12 @@ namespace Oduncu.Game
 
         public int Seed { get; private set; }
 
+        /// <summary>How hard the AI opponents of the current match play.</summary>
+        public Difficulty Difficulty { get; private set; } = Difficulty.Standard;
+
+        /// <summary>Single player game speed: simulation ticks per real tick interval, 1 or 2.</summary>
+        public int Speed { get; set; } = 1;
+
         /// <summary>Single player pause: the runner stops stepping (plan section 4).</summary>
         public bool Paused { get; set; }
 
@@ -56,14 +62,16 @@ namespace Oduncu.Game
         public bool HasMatch => Sim != null;
 
         /// <summary>Start a skirmish on the Open map against Standard AIs.</summary>
-        public void StartMatch(int seed)
+        public void StartMatch(int seed, Difficulty difficulty)
         {
             Seed = seed;
+            Difficulty = difficulty;
+            Speed = 1;
             Sim = OpenMap.Create(seed);
             _ais = new StandardAI[Sim.Players.Length];
             for (int p = 0; p < _ais.Length; p++)
             {
-                if (p != LocalPlayer) _ais[p] = new StandardAI(p, Sim.Rng.State);
+                if (p != LocalPlayer) _ais[p] = new StandardAI(p, Sim.Rng.State, difficulty);
             }
             _pending.Clear();
             _accumulator = 0f;
@@ -93,7 +101,7 @@ namespace Oduncu.Game
             }
 
             const float tickSeconds = 1f / SimConstants.TicksPerSecond;
-            _accumulator += Time.deltaTime;
+            _accumulator += Time.deltaTime * Mathf.Clamp(Speed, 1, 2);
             int steps = 0;
             while (_accumulator >= tickSeconds && steps < SimConstants.MaxCatchUpTicks && !Sim.MatchOver)
             {

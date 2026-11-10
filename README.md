@@ -60,7 +60,8 @@ Ids in the tables are stored in command logs, so never renumber or reuse one.
    `Assets/Game/Scenes/Skirmish.unity`, add it to the build settings, set landscape
    orientation, and turn on both input handlers (the Input System drives the gestures).
    Unity asks to restart the editor after that last change; say yes.
-3. Press Play, then "Skirmish vs Standard AI". You are blue. In the editor the mouse stands in
+3. Press Play, pick Easy or Standard, then "Start skirmish". You are blue. The 1x/2x button
+   under Menu doubles the game speed. In the editor the mouse stands in
    for one finger and the scroll wheel zooms; Escape pauses. The gestures are the table in
    design section 7: tap to select or command, double-tap for all of a type on screen,
    drag to pan, hold then drag to box-select, two fingers to pan and pinch to zoom.

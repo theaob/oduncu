@@ -7,7 +7,7 @@ namespace Oduncu.Game
 {
     /// <summary>
     /// Builds the game scene at runtime and runs the match flow (plan section 4): main menu,
-    /// "Skirmish vs Standard AI" on the Open map, pause, victory and defeat. The scene only
+    /// a skirmish against an Easy or Standard AI on the Open map, pause, victory and defeat. The scene only
     /// needs this component; everything else is created here so no hand-made scene or prefab
     /// has to live in the repository.
     /// </summary>
@@ -91,7 +91,7 @@ namespace Oduncu.Game
             _gestures.enabled = false;
             _player.CancelMode();
             Simulation sim = _runner.Sim;
-            _hud.ShowEnd(sim.Winner == _runner.LocalPlayer, sim.MatchEndTick);
+            _hud.ShowEnd(sim, sim.Winner == _runner.LocalPlayer);
         }
 
         private void OnApplicationPause(bool paused)
@@ -100,19 +100,20 @@ namespace Oduncu.Game
             if (paused && _playing && !_ended && !_runner.Paused) Pause();
         }
 
-        public void StartSkirmish()
+        public void StartSkirmish(Oduncu.Sim.AI.Difficulty difficulty)
         {
-            StartMatch(Environment.TickCount & 0x7fffffff);
+            StartMatch(Environment.TickCount & 0x7fffffff, difficulty);
         }
 
+        /// <summary>Same map, same opponent.</summary>
         public void Restart()
         {
-            StartMatch(_runner.Seed);
+            StartMatch(_runner.Seed, _runner.Difficulty);
         }
 
-        private void StartMatch(int seed)
+        private void StartMatch(int seed, Oduncu.Sim.AI.Difficulty difficulty)
         {
-            _runner.StartMatch(seed);
+            _runner.StartMatch(seed, difficulty);
             _playing = true;
             _ended = false;
             _hud.ShowMatch();
