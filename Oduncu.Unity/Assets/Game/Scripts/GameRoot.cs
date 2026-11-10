@@ -7,7 +7,7 @@ namespace Oduncu.Game
 {
     /// <summary>
     /// Builds the game scene at runtime and runs the match flow (plan section 4): main menu,
-    /// a skirmish against an Easy or Standard AI on the Open map, pause, victory and defeat. The scene only
+    /// a skirmish against an Easy, Standard or Hard AI on the Open map, pause, victory and defeat. The scene only
     /// needs this component; everything else is created here so no hand-made scene or prefab
     /// has to live in the repository.
     /// </summary>
