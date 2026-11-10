@@ -36,11 +36,12 @@ namespace Oduncu.Game
             new Color(0.86f, 0.3f, 0.26f), new Color(0.62f, 0.43f, 0.24f), new Color(0.98f, 0.8f, 0.2f), new Color(0.7f, 0.7f, 0.68f),
         };
         private static readonly string[] ResourceNames = { "Food", "Wood", "Gold", "Stone" };
-        private static readonly string[] DifficultyNames = { "Easy", "Standard" };
+        private static readonly string[] DifficultyNames = { "Easy", "Standard", "Hard" };
         private static readonly string[] DifficultyBlurbs =
         {
             "Easy: builds slowly, keeps a small army and leaves you alone for the first 8 minutes.",
             "Standard: a fair opponent. No extra resources, and it only knows what it has scouted.",
+            "Hard: just as fair, but it holds back until its army is big enough to finish the job.",
         };
 
         private GameRoot _game;
@@ -64,7 +65,7 @@ namespace Oduncu.Game
         private TapPad _speed;
         private VisualElement _hpBack;
         private VisualElement _hpFill;
-        private readonly TapPad[] _difficultyPads = new TapPad[2];
+        private readonly TapPad[] _difficultyPads = new TapPad[3];
         private Label _difficultyInfo;
         private Label _pauseInfo;
         private VisualElement _endTable;
@@ -560,12 +561,12 @@ namespace Oduncu.Game
             for (int d = 0; d < _difficultyPads.Length; d++)
             {
                 var level = (Difficulty)d;
-                _difficultyPads[d] = Pad(levels, DifficultyNames[d], () => SetDifficulty(level), 128, 52);
+                _difficultyPads[d] = Pad(levels, DifficultyNames[d], () => SetDifficulty(level), 100, 52);
             }
             _difficultyInfo = Text(_mainMenu, "", 12, Muted);
             _difficultyInfo.style.whiteSpace = WhiteSpace.Normal;
             _difficultyInfo.style.unityTextAlign = TextAnchor.MiddleCenter;
-            _difficultyInfo.style.width = 300;
+            _difficultyInfo.style.width = 312;
             _difficultyInfo.style.marginTop = 4;
             _difficultyInfo.style.marginBottom = 14;
             Pad(_mainMenu, "Start skirmish", () => _game.StartSkirmish(_difficulty), 260, 56).Selected = true;

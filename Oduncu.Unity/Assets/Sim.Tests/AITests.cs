@@ -152,7 +152,7 @@ namespace Oduncu.Sim.Tests
                 TestContext.WriteLine($"seed {seed}: winner {sim.Winner} at {sim.MatchEndTick / (double)TicksPerMinute:F1} min, "
                     + $"standard score {winner.Total}, easy score {loser.Total}");
             }
-            // Not every match: Standard's all-in at 13 minutes sometimes breaks on the easy side's town centre.
+            // Not every match: matches between these AIs are noisy, and Easy still fields twelve soldiers.
             Assert.GreaterOrEqual(standardWins, 4, "Standard should usually beat Easy");
             Assert.LessOrEqual(easyWins, 1, "Easy should rarely beat Standard");
 
@@ -181,6 +181,28 @@ namespace Oduncu.Sim.Tests
             Assert.LessOrEqual(b.UnitsKilled, a.UnitsLost);
             Assert.LessOrEqual(a.BuildingsRazed, b.BuildingsLost);
             Assert.LessOrEqual(b.BuildingsRazed, a.BuildingsLost);
+        }
+
+        [Test]
+        public void HardAiUsuallyBeatsStandard()
+        {
+            const int seeds = 10;
+            int hardWins = 0, standardWins = 0;
+            for (int seed = 1; seed <= seeds; seed++)
+            {
+                Simulation sim = OpenMap.Create(seed);
+                int hard = seed % 2;
+                var levels = new Difficulty[2];
+                levels[hard] = Difficulty.Hard;
+                levels[1 - hard] = Difficulty.Standard;
+                Scenarios.RunMatch(sim, 30 * TicksPerMinute, null, levels);
+                if (sim.MatchOver && sim.Winner == hard) hardWins++;
+                if (sim.MatchOver && sim.Winner == 1 - hard) standardWins++;
+            }
+            TestContext.WriteLine($"Hard vs Standard over {seeds} seeds: {hardWins}-{standardWins}");
+            // 31 to 9 over 40 seeds when it was tuned; ten seeds leave room for noise.
+            Assert.GreaterOrEqual(hardWins, 6, "Hard should usually beat Standard");
+            Assert.Greater(hardWins, standardWins);
         }
     }
 }
