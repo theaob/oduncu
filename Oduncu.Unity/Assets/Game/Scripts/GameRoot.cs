@@ -58,7 +58,7 @@ namespace Oduncu.Game
             ground.transform.SetParent(transform, false);
             ground.transform.position = new Vector3(OpenMap.Size / 2f, 0f, OpenMap.Size / 2f);
             ground.transform.localScale = new Vector3(OpenMap.Size / 10f, 1f, OpenMap.Size / 10f);
-            ground.GetComponent<Renderer>().sharedMaterial = PlaceholderArt.MaterialFor(GroundColor);
+            ground.GetComponent<Renderer>().sharedMaterial = PlaceholderArt.GroundMaterial(GroundColor, OpenMap.Size);
 
             var preview = new GameObject("Placement").AddComponent<PlacementPreview>();
             preview.transform.SetParent(transform, false);
@@ -66,7 +66,8 @@ namespace Oduncu.Game
             _presenter = gameObject.AddComponent<EntityPresenter>();
             _player = gameObject.AddComponent<PlayerController>();
             _player.Init(_runner, _rig, preview);
-            _presenter.Init(_runner, _player.Selection);
+            _presenter.Init(_runner, _player.Selection, cam);
+            _player.Ordered += _presenter.ShowOrder;
             gameObject.AddComponent<FogOverlay>().Init(_runner, cam);
 
             _gestures = gameObject.AddComponent<GestureInput>();
