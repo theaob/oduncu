@@ -152,7 +152,7 @@ namespace Oduncu.Sim
                 u.HasPath = false;
                 if (u.Cooldown > 0) return;
                 u.Cooldown = u.Stats.AttackTicks;
-                DealDamage(u.Id, animal, SimConstants.VillagerHuntDamage);
+                DealDamage(u.Id, u.Owner, animal, SimConstants.VillagerHuntDamage);
                 return;
             }
             if (!EnsurePathTo(u, animal)) { SetIdle(u); return; }
@@ -187,6 +187,7 @@ namespace Oduncu.Sim
                 return;
             }
             Players[u.Owner].Add(u.CarryKind, u.Carry);
+            Players[u.Owner].Score.Gathered += u.Carry;
             u.Carry = 0;
             u.State = UnitState.Gathering;
             u.HasPath = false;

@@ -131,5 +131,56 @@ namespace Oduncu.Sim.Tests
             TestContext.WriteLine($"Idle AI reaches Imperial: fastest {times[0] / (double)TicksPerMinute:F1} min, "
                 + $"median {(times[4] + times[5]) / 2.0 / TicksPerMinute:F1} min, slowest {times[9] / (double)TicksPerMinute:F1} min");
         }
+
+        [Test]
+        public void EasyAiDoesNotAttackBeforeEightMinutesAndLosesToStandard()
+        {
+            const int seeds = 6;
+            int standardWins = 0, easyWins = 0;
+            for (int seed = 1; seed <= seeds; seed++)
+            {
+                Simulation sim = OpenMap.Create(seed);
+                // The easy side alternates so neither start position is favoured.
+                int easy = seed % 2;
+                var levels = new Difficulty[2];
+                levels[easy] = Difficulty.Easy;
+                levels[1 - easy] = Difficulty.Standard;
+                Scenarios.RunMatch(sim, 30 * TicksPerMinute, null, levels);
+                if (sim.MatchOver && sim.Winner == 1 - easy) standardWins++;
+                if (sim.MatchOver && sim.Winner == easy) easyWins++;
+                MatchScore loser = sim.Players[easy].Score, winner = sim.Players[1 - easy].Score;
+                TestContext.WriteLine($"seed {seed}: winner {sim.Winner} at {sim.MatchEndTick / (double)TicksPerMinute:F1} min, "
+                    + $"standard score {winner.Total}, easy score {loser.Total}");
+            }
+            // Not every match: Standard's all-in at 13 minutes sometimes breaks on the easy side's town centre.
+            Assert.GreaterOrEqual(standardWins, 4, "Standard should usually beat Easy");
+            Assert.LessOrEqual(easyWins, 1, "Easy should rarely beat Standard");
+
+            // Two easy AIs leave each other alone for the first eight minutes.
+            Simulation quiet = OpenMap.Create(3);
+            var both = new[] { Difficulty.Easy, Difficulty.Easy };
+            Scenarios.RunMatch(quiet, StandardAI.EasyFirstAttackTick, null, both);
+            for (int p = 0; p < 2; p++)
+            {
+                Assert.AreEqual(0, quiet.Players[p].Score.BuildingsLost, "player " + p + " lost a building before 8:00");
+                Assert.Greater(quiet.Players[p].Score.Gathered, 1000, "player " + p + " should still run an economy");
+            }
+        }
+
+        [Test]
+        public void MatchScoresAddUpAcrossBothSides()
+        {
+            Simulation sim = OpenMap.Create(5);
+            Scenarios.RunMatch(sim, MatchLimit);
+            MatchScore a = sim.Players[0].Score, b = sim.Players[1].Score;
+            Assert.Greater(a.Gathered, 0);
+            Assert.Greater(b.Gathered, 0);
+            Assert.Greater(a.UnitsKilled + b.UnitsKilled, 0, "someone should have died in 25 minutes");
+            // Every kill is the other side's loss; losses may also come from friendly splash.
+            Assert.LessOrEqual(a.UnitsKilled, b.UnitsLost);
+            Assert.LessOrEqual(b.UnitsKilled, a.UnitsLost);
+            Assert.LessOrEqual(a.BuildingsRazed, b.BuildingsLost);
+            Assert.LessOrEqual(b.BuildingsRazed, a.BuildingsLost);
+        }
     }
 }
