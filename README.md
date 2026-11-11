@@ -19,7 +19,7 @@ redesigned for touch and 15-minute matches. Built with Unity 6 and C#.
 | `Oduncu.Unity/Assets/Game/` | Presentation: tick runner with the AI opponent, placeholder art, fog, touch gestures, UI Toolkit HUD, match flow, editor bootstrap and build script. |
 | `tools/GameCompileCheck/` | Compiles `Assets/Game` against Unity reference assemblies, so CI catches game-script compile errors without a Unity licence. |
 | `Oduncu.Sim/`, `Oduncu.Sim.Tests/` | .NET projects that compile the same sources outside Unity for CI, servers and tools. |
-| `.github/workflows/ci.yml` | Runs the headless tests on every push; builds an Android APK when Unity licence secrets are set. |
+| `.github/workflows/ci.yml` | Runs the headless tests on every push; builds an Android APK on pushes to `main`, pull requests into `main` and manual runs, once Unity licence secrets are set. |
 
 ## Running the simulation tests without Unity
 
