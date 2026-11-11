@@ -10,16 +10,26 @@ namespace Oduncu.Sim
     /// </summary>
     public sealed partial class Simulation
     {
+        /// <summary>Free entity objects kept ready so spawning on the tick path does not allocate.</summary>
+        public const int EntityPoolReserve = 64;
+        private const int EntityPoolLowWater = 16;
+
         public readonly MapGrid Map;
         public readonly PlayerState[] Players;
         public readonly DeterministicRandom Rng;
+        public readonly SpatialIndex Index;
+        public readonly FogOfWar Fog;
         public int CurrentTick { get; private set; }
 
-        private readonly List<Entity> _entities = new List<Entity>();
-        private readonly Dictionary<int, Entity> _byId = new Dictionary<int, Entity>();
+        private readonly List<Entity> _entities = new List<Entity>(1024);
+        private readonly Dictionary<int, Entity> _byId = new Dictionary<int, Entity>(1024);
+        private readonly Stack<Entity> _pool = new Stack<Entity>(EntityPoolReserve * 2);
         private readonly Pathfinder _pathfinder;
+        private readonly FlowFieldCache _flowFields;
         private readonly StateHasher _hasher = new StateHasher();
-        private readonly List<Entity> _spawnedThisTick = new List<Entity>();
+        private readonly PlayerStats _neutralStats = new PlayerStats();
+        private readonly List<Entity> _scratchUnits = new List<Entity>(64);
+        private readonly int[] _scratchMaxHp = new int[GameData.EntityKindCount];
         private int _nextId = 1;
 
         /// <summary>Alive entities in ascending id order. Do not mutate.</summary>
@@ -29,10 +39,17 @@ namespace Oduncu.Sim
         {
             if (playerCount < 1 || playerCount > SimConstants.MaxPlayers) throw new ArgumentOutOfRangeException(nameof(playerCount));
             Map = new MapGrid(width, height);
+            Index = new SpatialIndex(width, height);
+            Fog = new FogOfWar(width, height, playerCount);
             Players = new PlayerState[playerCount];
-            for (int i = 0; i < playerCount; i++) Players[i] = new PlayerState { Index = i, Wood = SimConstants.StartingWood };
+            for (int i = 0; i < playerCount; i++)
+            {
+                Players[i] = new PlayerState { Index = i };
+                Players[i].Set(SimConstants.StartingResources);
+            }
             Rng = new DeterministicRandom(seed);
             _pathfinder = new Pathfinder(Map);
+            _flowFields = new FlowFieldCache(Map, SimConstants.FlowFieldPoolSize);
         }
 
         public Entity Find(int id)
@@ -45,10 +62,15 @@ namespace Oduncu.Sim
         public void Step(IReadOnlyList<Command> commands)
         {
             CurrentTick++;
+            TopUpPool();
+            if (_fogDirty) UpdateFog();
             if (commands != null)
             {
                 for (int i = 0; i < commands.Count; i++) ApplyCommand(commands[i]);
             }
+
+            RecountPopulation();
+            for (int p = 0; p < Players.Length; p++) RunEconomyPlanner(p);
 
             // Iterate by index over a snapshot count: entities spawned this tick are appended
             // and get their first update next tick, which keeps ordering deterministic.
@@ -61,8 +83,11 @@ namespace Oduncu.Sim
                 else if (e.IsBuilding) UpdateBuilding(e);
             }
 
+            UpdateProjectiles();
+            SeparateUnits();
             RemoveDead();
             UpdatePlayersAlive();
+            UpdateFog();
         }
 
         public ulong ComputeHash()
@@ -71,10 +96,23 @@ namespace Oduncu.Sim
             _hasher.Write(CurrentTick);
             _hasher.Write(Rng.State);
             _hasher.Write(_nextId);
+            _hasher.Write(Winner);
+            _hasher.Write(MatchEndTick);
+            WriteMarketState(_hasher);
+            _hasher.Write((int)Reveal);
+            _hasher.Write(_projectiles.Count);
+            for (int i = 0; i < _projectiles.Count; i++) _projectiles[i].WriteState(_hasher);
             for (int i = 0; i < Players.Length; i++) Players[i].WriteState(_hasher);
             for (int i = 0; i < _entities.Count; i++) _entities[i].WriteState(_hasher);
             Map.WriteState(_hasher);
+            Fog.WriteState(_hasher);
             return _hasher.Value;
+        }
+
+        /// <summary>Stats for an entity kind as its owner currently has them. Neutral entities use base stats.</summary>
+        public UnitStats StatsFor(int owner, EntityKind kind)
+        {
+            return owner >= 0 && owner < Players.Length ? Players[owner].Stats.Of(kind) : _neutralStats.Of(kind);
         }
 
         // ------------------------------------------------------------------ spawning
@@ -82,11 +120,13 @@ namespace Oduncu.Sim
         public Entity SpawnUnit(EntityKind kind, int owner, Cell at)
         {
             var def = EntityDefs.Get(kind);
-            if (!def.IsUnit) throw new ArgumentException(kind + " is not a unit");
+            if (!def.IsUnit) throw new ArgumentException("not a unit: " + kind);
             var e = NewEntity(kind, def, owner);
             e.Cell = Map.Clamp(at);
             e.Position = FPVector2.CellCentre(e.Cell);
             e.State = UnitState.Idle;
+            e.Amount = def.ResourceAmount;
+            Index.Add(e);
             return e;
         }
 
@@ -94,7 +134,7 @@ namespace Oduncu.Sim
         public Entity SpawnStructure(EntityKind kind, int owner, Cell origin, bool underConstruction)
         {
             var def = EntityDefs.Get(kind);
-            if (!def.IsBuilding && !def.IsResource) throw new ArgumentException(kind + " is not a structure");
+            if (!def.IsBuilding && !def.IsResource) throw new ArgumentException("not a structure: " + kind);
             var rect = new CellRect(origin.X, origin.Y, def.Size);
             if (!Map.IsRectInBounds(rect) || !Map.IsRectFree(rect)) return null;
             var e = NewEntity(kind, def, owner);
@@ -103,20 +143,30 @@ namespace Oduncu.Sim
             e.Amount = def.ResourceAmount;
             if (def.IsBuilding)
             {
-                e.TrainQueue = new List<EntityKind>();
                 e.UnderConstruction = underConstruction;
                 if (underConstruction) e.Hp = 1;
             }
             Map.Occupy(rect, e.Id);
+            if (def.HasTag(EntityTag.Gate)) Map.SetGate(rect, owner);
+            Index.Add(e);
             return e;
         }
 
         private Entity NewEntity(EntityKind kind, EntityDef def, int owner)
         {
-            var e = new Entity { Id = _nextId++, Kind = kind, Def = def, Owner = owner, Hp = def.MaxHp };
+            Entity e = _pool.Count > 0 ? _pool.Pop() : new Entity();
+            e.Reset(_nextId++, kind, def, owner, StatsFor(owner, kind));
             _entities.Add(e);
             _byId.Add(e.Id, e);
+            _fogDirty = true;
             return e;
+        }
+
+        /// <summary>Allocate pooled entities in one batch when the reserve runs low, never one per spawn.</summary>
+        private void TopUpPool()
+        {
+            if (_pool.Count >= EntityPoolLowWater) return;
+            while (_pool.Count < EntityPoolReserve) _pool.Push(new Entity());
         }
 
         private void Kill(Entity e)
@@ -124,40 +174,62 @@ namespace Oduncu.Sim
             if (!e.Alive) return;
             e.Alive = false;
             if (e.IsBuilding || e.IsResource) Map.Clear(e.Footprint);
+            Index.Remove(e);
+            if (e.IsBuilding) Eject(e);
         }
 
+        /// <summary>Compact the entity list in place and return dead entities to the pool.</summary>
         private void RemoveDead()
         {
-            bool any = false;
-            for (int i = 0; i < _entities.Count; i++) if (!_entities[i].Alive) { any = true; break; }
-            if (!any) return;
-            for (int i = 0; i < _entities.Count; i++) if (!_entities[i].Alive) _byId.Remove(_entities[i].Id);
-            _entities.RemoveAll(e => !e.Alive);
+            int write = 0;
+            for (int read = 0; read < _entities.Count; read++)
+            {
+                Entity e = _entities[read];
+                if (e.Alive)
+                {
+                    _entities[write++] = e;
+                    continue;
+                }
+                _byId.Remove(e.Id);
+                _pool.Push(e);
+            }
+            if (write < _entities.Count) _entities.RemoveRange(write, _entities.Count - write);
         }
 
-        private void UpdatePlayersAlive()
+        // ------------------------------------------------------------------ research
+
+        /// <summary>
+        /// Apply a finished tech to a player: rebuild their stat table and raise the hit points
+        /// of existing entities whose maximum changed. Production queues call this when research
+        /// completes; tests and scenario setup may call it directly. Returns false if the tech
+        /// was already researched.
+        /// </summary>
+        public bool CompleteResearch(int player, TechId tech)
         {
-            for (int p = 0; p < Players.Length; p++)
+            PlayerStats stats = Players[player].Stats;
+            if (tech == TechId.None || stats.HasResearched(tech)) return false;
+            for (int k = 0; k < _scratchMaxHp.Length; k++) _scratchMaxHp[k] = stats.Of((EntityKind)k).MaxHp;
+            stats.Research(tech);
+            for (int i = 0; i < _entities.Count; i++)
             {
-                bool alive = false;
-                for (int i = 0; i < _entities.Count && !alive; i++)
-                {
-                    Entity e = _entities[i];
-                    if (e.Owner == p && (e.IsUnit || e.Kind == EntityKind.TownCenter)) alive = true;
-                }
-                Players[p].Alive = alive;
+                Entity e = _entities[i];
+                if (!e.Alive || e.Owner != player || e.UnderConstruction) continue;
+                int delta = e.Stats.MaxHp - _scratchMaxHp[(int)e.Kind];
+                if (delta != 0) e.Hp = Math.Max(1, e.Hp + delta);
             }
+            return true;
         }
 
         // ------------------------------------------------------------------ queries
 
+        /// <summary>Living units of a player, not counting animals they herd.</summary>
         public int CountUnits(int owner)
         {
             int n = 0;
             for (int i = 0; i < _entities.Count; i++)
             {
                 Entity e = _entities[i];
-                if (e.Alive && e.Owner == owner && e.IsUnit) n++;
+                if (e.Alive && e.Owner == owner && e.IsUnit && !e.Def.IsAnimal) n++;
             }
             return n;
         }
@@ -168,31 +240,13 @@ namespace Oduncu.Sim
             for (int i = 0; i < _entities.Count; i++)
             {
                 Entity e = _entities[i];
-                if (e.Alive && e.Owner == owner && e.IsBuilding && e.TrainQueue != null) n += e.TrainQueue.Count;
+                if (!e.Alive || e.Owner != owner || !e.IsBuilding) continue;
+                for (int q = 0; q < e.TrainQueue.Count; q++) if (!e.TrainQueue[q].IsResearch) n++;
             }
             return n;
         }
 
         public bool IsEnemy(Entity a, Entity b) => a.Owner != b.Owner && a.Owner >= 0 && b.Owner >= 0;
-
-        /// <summary>Nearest entity matching the predicate within radius tiles of a position. Ties go to the lower id.</summary>
-        public Entity FindNearest(FPVector2 from, int radius, Func<Entity, bool> predicate)
-        {
-            Entity best = null;
-            FP bestDist = FP.FromInt(radius * radius);
-            for (int i = 0; i < _entities.Count; i++)
-            {
-                Entity e = _entities[i];
-                if (!e.Alive || !predicate(e)) continue;
-                FP d = FPVector2.SqrDistance(from, NearestPointOf(e, from));
-                if (d < bestDist || (best == null && d == bestDist))
-                {
-                    best = e;
-                    bestDist = d;
-                }
-            }
-            return best;
-        }
 
         /// <summary>Closest point of an entity to a position: its centre for units, its rect boundary otherwise.</summary>
         public static FPVector2 NearestPointOf(Entity e, FPVector2 from)
@@ -201,7 +255,10 @@ namespace Oduncu.Sim
         }
 
         /// <summary>A free cell near a footprint for a trained unit to appear on, searching outward rings.</summary>
-        private bool FindSpawnCell(CellRect around, out Cell cell)
+        private bool FindSpawnCell(CellRect around, out Cell cell) => FindSpawnCell(around, 0, out cell);
+
+        /// <summary>The free cell after skipping the first <paramref name="skip"/> ones, so a group spreads out.</summary>
+        private bool FindSpawnCell(CellRect around, int skip, out Cell cell)
         {
             for (int ring = 1; ring <= 4; ring++)
             {
@@ -213,21 +270,14 @@ namespace Oduncu.Sim
                     {
                         bool onRing = x == x0 || x == x1 || y == y0 || y == y1;
                         if (!onRing) continue;
-                        if (Map.IsFree(x, y)) { cell = new Cell(x, y); return true; }
+                        if (!Map.IsFree(x, y)) continue;
+                        if (skip-- > 0) continue;
+                        cell = new Cell(x, y);
+                        return true;
                     }
                 }
             }
             cell = default;
-            return false;
-        }
-
-        private bool AnyUnitInside(CellRect rect)
-        {
-            for (int i = 0; i < _entities.Count; i++)
-            {
-                Entity e = _entities[i];
-                if (e.Alive && e.IsUnit && rect.Contains(e.Cell)) return true;
-            }
             return false;
         }
     }

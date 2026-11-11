@@ -7,11 +7,14 @@ namespace Oduncu.Sim
         private void UpdateUnit(Entity u)
         {
             if (u.Cooldown > 0) u.Cooldown--;
+            if (u.State != UnitState.Carcass && u.Def.HasTag(EntityTag.Herdable)) UpdateHerdOwnership(u);
 
             switch (u.State)
             {
                 case UnitState.Idle:
                     if (u.Def.IsMilitary) AutoEngage(u);
+                    else if (u.Def.HasTag(EntityTag.Monk)) FindHealTarget(u);
+                    else if (u.Def.IsAnimal) UpdateIdleAnimal(u);
                     break;
                 case UnitState.Moving:
                     UpdateMoving(u);
@@ -25,8 +28,20 @@ namespace Oduncu.Sim
                 case UnitState.Building:
                     UpdateBuildingWork(u);
                     break;
+                case UnitState.Repairing:
+                    UpdateRepairing(u);
+                    break;
                 case UnitState.Attacking:
                     UpdateAttacking(u);
+                    break;
+                case UnitState.Garrisoning:
+                    UpdateGarrisoning(u);
+                    break;
+                case UnitState.Healing:
+                    UpdateHealing(u);
+                    break;
+                case UnitState.Carcass:
+                case UnitState.Garrisoned:
                     break;
             }
         }
@@ -35,40 +50,73 @@ namespace Oduncu.Sim
 
         private void UpdateMoving(Entity u)
         {
-            if (u.Path == null)
+            if (u.AttackMove && (CurrentTick + u.Id) % SimConstants.AutoEngageInterval == 0)
             {
-                u.Path = new List<Cell>();
-                if (!_pathfinder.FindPathToCell(u.Cell, u.MoveTarget, u.Path)) { SetIdle(u); return; }
+                Entity target = FindAttackTarget(u, FP.FromInt(u.Stats.LineOfSight));
+                if (target != null)
+                {
+                    u.State = UnitState.Attacking;
+                    u.TargetId = target.Id;
+                    u.AutoTarget = true;
+                    u.HasPath = false;
+                    return;
+                }
+            }
+            FP speed = u.SpeedCap > FP.Zero ? FP.Min(u.Stats.Speed, u.SpeedCap) : u.Stats.Speed;
+            if (u.UsesFlow)
+            {
+                // Large groups share one flow field until close, then each unit paths to its own slot.
+                Cell next;
+                if (Cell.Chebyshev(u.Cell, u.FlowGoal) > SimConstants.FlowHandoffDistance && _flowFields.NextCell(u.FlowGoal, u.Cell, u.Owner, out next))
+                {
+                    StepToward(u, next, speed);
+                    return;
+                }
+                u.UsesFlow = false;
+                u.HasPath = false;
+            }
+            if (!u.HasPath)
+            {
+                if (!_pathfinder.FindPathToCell(u.Cell, u.MoveTarget, u.Path, u.Owner)) { SetIdle(u); return; }
+                u.HasPath = true;
                 u.PathIndex = 0;
             }
-            if (StepAlongPath(u)) SetIdle(u);
+            if (StepAlongPath(u, speed)) SetIdle(u);
         }
 
-        /// <summary>Move along the current path. Returns true when the path is finished or lost.</summary>
-        private bool StepAlongPath(Entity u)
+        /// <summary>Move toward a neighbouring cell's centre. Returns true on arrival.</summary>
+        private bool StepToward(Entity u, Cell cell, FP speed)
         {
-            if (u.Path == null || u.PathIndex >= u.Path.Count) return true;
-            Cell next = u.Path[u.PathIndex];
-            if (!Map.IsFree(next))
-            {
-                // Something was built across the path; drop it so the owner state recomputes.
-                u.Path = null;
-                return false;
-            }
-            FPVector2 target = FPVector2.CellCentre(next);
+            FPVector2 target = FPVector2.CellCentre(cell);
             FPVector2 delta = target - u.Position;
             FP dist = delta.Magnitude;
-            FP speed = u.Def.Speed;
             if (dist <= speed)
             {
                 u.Position = target;
-                u.Cell = next;
-                u.PathIndex++;
-                return u.PathIndex >= u.Path.Count;
+                SetUnitCell(u, cell);
+                return true;
             }
             u.Position = u.Position + delta.Normalized * speed;
-            u.Cell = u.Position.ToCell();
+            SetUnitCell(u, u.Position.ToCell());
             return false;
+        }
+
+        private bool StepAlongPath(Entity u) => StepAlongPath(u, u.Stats.Speed);
+
+        /// <summary>Move along the current path. Returns true when the path is finished or lost.</summary>
+        private bool StepAlongPath(Entity u, FP speed)
+        {
+            if (!u.HasPath || u.PathIndex >= u.Path.Count) return true;
+            Cell next = u.Path[u.PathIndex];
+            if (!Map.IsPassable(next, u.Owner))
+            {
+                // Something was built across the path; drop it so the owner state recomputes.
+                u.HasPath = false;
+                return false;
+            }
+            if (!StepToward(u, next, speed)) return false;
+            u.PathIndex++;
+            return u.PathIndex >= u.Path.Count;
         }
 
         private bool IsAdjacent(Entity u, Entity target)
@@ -80,168 +128,199 @@ namespace Oduncu.Sim
         private bool EnsurePathTo(Entity u, Entity target)
         {
             Cell goal = target.Cell;
-            bool stale = u.Path == null
+            bool stale = !u.HasPath
                 || goal != u.PathGoal
                 || (target.IsUnit && CurrentTick - u.PathAge >= SimConstants.ChaseRepathInterval);
             if (!stale) return true;
-            if (u.Path == null) u.Path = new List<Cell>();
+            u.HasPath = true;
             u.PathGoal = goal;
             u.PathAge = CurrentTick;
             u.PathIndex = 0;
-            return _pathfinder.FindPathAdjacentToRect(u.Cell, target.Footprint, u.Path);
+            return _pathfinder.FindPathAdjacentToRect(u.Cell, target.Footprint, u.Path, u.Owner);
+        }
+
+        /// <summary>An attack-moving unit whose fight is over walks on; anything else goes idle.</summary>
+        private void FinishFight(Entity u)
+        {
+            if (!u.AttackMove) { SetIdle(u); return; }
+            u.State = UnitState.Moving;
+            u.TargetId = 0;
+            u.AutoTarget = false;
+            u.HasPath = false;
+            u.UsesFlow = false;
         }
 
         private void SetIdle(Entity u)
         {
+            u.AttackMove = false;
             u.State = UnitState.Idle;
-            u.Path = null;
+            u.HasPath = false;
             u.TargetId = 0;
+            u.AutoTarget = false;
+            u.ChannelTicks = 0;
+            u.SpeedCap = FP.Zero;
+            u.UsesFlow = false;
         }
 
-        // ------------------------------------------------------------------ economy
-
-        private Entity FindNearestTree(Entity u)
+        private void MoveTo(Entity u, Cell cell)
         {
-            return FindNearest(u.Position, SimConstants.ResourceSearchRadius, e => e.Kind == EntityKind.Tree && e.Amount > 0);
+            u.AttackMove = false;
+            u.State = UnitState.Moving;
+            u.MoveTarget = Map.Clamp(cell);
+            u.HasPath = false;
+            u.TargetId = 0;
+            u.AutoTarget = false;
+            u.ChannelTicks = 0;
+            u.SpeedCap = FP.Zero;
+            u.UsesFlow = false;
         }
 
-        private Entity FindNearestDropOff(Entity u)
-        {
-            int owner = u.Owner;
-            return FindNearest(u.Position, Map.Width + Map.Height, e => e.IsBuilding && e.Def.IsDropOff && e.Owner == owner && !e.UnderConstruction);
-        }
+        // ------------------------------------------------------------------ separation
 
-        private void UpdateGathering(Entity u)
+        private static readonly FPVector2[] SeparationDirections =
         {
-            Entity source = Find(u.GatherSourceId);
-            if (source == null || !source.IsResource || source.Amount <= 0)
+            new FPVector2(FP.One, FP.Zero), new FPVector2(FP.Zero, FP.One), new FPVector2(-FP.One, FP.Zero), new FPVector2(FP.Zero, -FP.One),
+            new FPVector2(FP.Ratio(7071, 10000), FP.Ratio(7071, 10000)), new FPVector2(-FP.Ratio(7071, 10000), FP.Ratio(7071, 10000)),
+            new FPVector2(-FP.Ratio(7071, 10000), -FP.Ratio(7071, 10000)), new FPVector2(FP.Ratio(7071, 10000), -FP.Ratio(7071, 10000)),
+        };
+
+        /// <summary>Units at work hold their spot: they push others but are not pushed.</summary>
+        private static bool IsAnchored(Entity u)
+        {
+            switch (u.State)
             {
-                source = FindNearestTree(u);
-                if (source == null)
+                case UnitState.Gathering:
+                case UnitState.Building:
+                case UnitState.Repairing:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        /// <summary>
+        /// Soft collision (plan 3.4): each unit, in id order, moves away from units closer than
+        /// SeparationRadius by up to MaxSeparationPush per tick. A push that would end in a
+        /// blocked cell is tried along each axis alone and dropped if both are blocked. Units
+        /// on exactly the same spot split along a direction picked from their ids.
+        /// </summary>
+        private void SeparateUnits()
+        {
+            FP radius = SimConstants.SeparationRadius;
+            FP radius2 = radius * radius;
+            FP maxPush = SimConstants.MaxSeparationPush;
+            for (int i = 0; i < _entities.Count; i++)
+            {
+                Entity u = _entities[i];
+                if (!u.Alive || !u.IsUnit || u.IndexBucket < 0 || u.State == UnitState.Carcass || IsAnchored(u)) continue;
+
+                FPVector2 push = FPVector2.Zero;
+                int bx0 = Index.BucketXOf(u.Cell.X - 1), bx1 = Index.BucketXOf(u.Cell.X + 1);
+                int by0 = Index.BucketYOf(u.Cell.Y - 1), by1 = Index.BucketYOf(u.Cell.Y + 1);
+                for (int by = by0; by <= by1; by++)
                 {
-                    if (u.Carry > 0) { u.State = UnitState.Returning; u.Path = null; }
-                    else SetIdle(u);
-                    return;
+                    for (int bx = bx0; bx <= bx1; bx++)
+                    {
+                        var bucket = Index.Bucket(bx, by);
+                        for (int k = 0; k < bucket.Count; k++)
+                        {
+                            Entity v = bucket[k];
+                            if (v == u || !v.Alive || !v.IsUnit || v.State == UnitState.Carcass) continue;
+                            FPVector2 diff = u.Position - v.Position;
+                            FP d2 = diff.SqrMagnitude;
+                            if (d2 >= radius2) continue;
+                            if (d2 == FP.Zero)
+                            {
+                                int lo = u.Id < v.Id ? u.Id : v.Id, hi = u.Id < v.Id ? v.Id : u.Id;
+                                FPVector2 dir = SeparationDirections[(lo * 31 + hi) & 7];
+                                push = push + (u.Id == lo ? dir : FPVector2.Zero - dir) * (radius / 2);
+                                continue;
+                            }
+                            FP d = FP.Sqrt(d2);
+                            push = push + diff * ((radius - d) / (d * 2));
+                        }
+                    }
                 }
-                u.GatherSourceId = source.Id;
-                u.Path = null;
-            }
+                if (push == FPVector2.Zero) continue;
+                if (push.SqrMagnitude > maxPush * maxPush) push = push.Normalized * maxPush;
 
-            if (!IsAdjacent(u, source))
-            {
-                if (!EnsurePathTo(u, source)) { SetIdle(u); return; }
-                StepAlongPath(u);
-                return;
-            }
-
-            u.Path = null;
-            u.WorkTimer++;
-            if (u.WorkTimer < SimConstants.GatherTicks) return;
-            u.WorkTimer = 0;
-            u.Carry++;
-            source.Amount--;
-            if (source.Amount <= 0) Kill(source);
-            if (u.Carry >= SimConstants.VillagerCarryCapacity)
-            {
-                u.State = UnitState.Returning;
-                u.Path = null;
+                FPVector2 to = u.Position + push;
+                if (!Map.IsPassable(to.ToCell(), u.Owner))
+                {
+                    to = new FPVector2(u.Position.X + push.X, u.Position.Y);
+                    if (!Map.IsPassable(to.ToCell(), u.Owner))
+                    {
+                        to = new FPVector2(u.Position.X, u.Position.Y + push.Y);
+                        if (!Map.IsPassable(to.ToCell(), u.Owner)) continue;
+                    }
+                }
+                u.Position = to;
+                SetUnitCell(u, to.ToCell());
             }
         }
 
-        private void UpdateReturning(Entity u)
-        {
-            Entity dropOff = FindNearestDropOff(u);
-            if (dropOff == null) { SetIdle(u); return; }
-            if (!IsAdjacent(u, dropOff))
-            {
-                if (!EnsurePathTo(u, dropOff)) { SetIdle(u); return; }
-                StepAlongPath(u);
-                return;
-            }
-            Players[u.Owner].Wood += u.Carry;
-            u.Carry = 0;
-            u.State = UnitState.Gathering;
-            u.Path = null;
-        }
+        // ------------------------------------------------------------------ formations
 
-        private void UpdateBuildingWork(Entity u)
+        /// <summary>
+        /// Group move (plan 3.4): units, in id order, take slots on a square grid centred on
+        /// the target, one cell apart, and the group moves at its slowest unit's speed. Groups
+        /// larger than FlowFieldGroupThreshold share a flow field to the target.
+        /// </summary>
+        private void OrderGroupMove(List<Entity> units, Cell target)
         {
-            Entity site = Find(u.BuildSiteId);
-            if (site == null || !site.IsBuilding || !site.UnderConstruction)
+            int n = units.Count;
+            if (n == 0) return;
+            FP cap = FP.Zero;
+            if (n > 1)
             {
-                ResumePreviousJob(u);
-                return;
+                cap = units[0].Stats.Speed;
+                for (int i = 1; i < n; i++) cap = FP.Min(cap, units[i].Stats.Speed);
             }
-            if (!IsAdjacent(u, site))
+            int cols = (int)FP.IntegerSqrt((ulong)n);
+            if (cols * cols < n) cols++;
+            int rows = (n + cols - 1) / cols;
+            bool flow = n > SimConstants.FlowFieldGroupThreshold;
+            for (int i = 0; i < n; i++)
             {
-                if (!EnsurePathTo(u, site)) { SetIdle(u); return; }
-                StepAlongPath(u);
-                return;
-            }
-            u.Path = null;
-            site.BuildProgress++;
-            int max = site.Def.MaxHp;
-            site.Hp = 1 + (int)((long)(max - 1) * site.BuildProgress / site.Def.BuildTicks);
-            if (site.BuildProgress >= site.Def.BuildTicks)
-            {
-                site.UnderConstruction = false;
-                site.Hp = max;
-            }
-        }
-
-        private void ResumePreviousJob(Entity u)
-        {
-            u.BuildSiteId = 0;
-            if (u.PreviousGatherSourceId != 0 || u.Carry > 0)
-            {
-                u.GatherSourceId = u.PreviousGatherSourceId;
+                Entity u = units[i];
+                var slot = new Cell(target.X + i % cols - (cols - 1) / 2, target.Y + i / cols - (rows - 1) / 2);
+                MoveTo(u, slot);
                 u.PreviousGatherSourceId = 0;
-                u.State = UnitState.Gathering;
-                u.Path = null;
-                u.WorkTimer = 0;
-                return;
+                u.SpeedCap = cap;
+                u.UsesFlow = flow;
+                u.FlowGoal = target;
             }
-            SetIdle(u);
         }
 
-        // ------------------------------------------------------------------ combat
+        // ------------------------------------------------------------------ animals
 
-        private void AutoEngage(Entity u)
+        /// <summary>Deer run a short way from any unit that comes close; boar turn on whatever hurt them.</summary>
+        private void UpdateIdleAnimal(Entity a)
         {
-            if ((CurrentTick + u.Id) % SimConstants.AutoEngageInterval != 0) return;
-            int owner = u.Owner;
-            Entity target = FindNearest(u.Position, u.Def.LineOfSight, e => e.Owner >= 0 && e.Owner != owner && (e.IsUnit || e.IsBuilding));
-            if (target == null) return;
-            u.State = UnitState.Attacking;
-            u.TargetId = target.Id;
-            u.Path = null;
-        }
+            if ((CurrentTick + a.Id) % SimConstants.AnimalCheckInterval != 0) return;
 
-        private bool InRange(Entity u, Entity target)
-        {
-            FP d = FPVector2.Distance(u.Position, NearestPointOf(target, u.Position));
-            return d <= u.Def.Range;
-        }
-
-        private void UpdateAttacking(Entity u)
-        {
-            Entity target = Find(u.TargetId);
-            if (target == null || target.IsResource) { SetIdle(u); return; }
-
-            if (InRange(u, target))
+            if (a.Def.HasTag(EntityTag.Retaliates))
             {
-                u.Path = null;
-                if (u.Cooldown > 0) return;
-                u.Cooldown = u.Def.AttackTicks;
-                int damage = u.Def.Attack - target.Def.Armor;
-                if (damage < 1) damage = 1;
-                target.Hp -= damage;
-                if (target.Hp <= 0) Kill(target);
+                Entity attacker = Find(a.LastAttackerId);
+                if (IsAttackable(attacker) && FPVector2.SqrDistance(a.Position, attacker.Position) <= FP.FromInt(a.Stats.LineOfSight * a.Stats.LineOfSight))
+                {
+                    a.State = UnitState.Attacking;
+                    a.TargetId = attacker.Id;
+                    a.HasPath = false;
+                }
                 return;
             }
 
-            if (!EnsurePathTo(u, target)) { SetIdle(u); return; }
-            StepAlongPath(u);
+            if (a.Def.HasTag(EntityTag.Flees))
+            {
+                var filter = new EntityFilter { Category = EntityCategory.Unit, ExcludeTags = EntityTag.Animal };
+                Entity threat = FindNearest(a.Position, SimConstants.FleeTriggerRange, ref filter);
+                if (threat == null) return;
+                FPVector2 away = (a.Position - threat.Position).Normalized;
+                if (away == FPVector2.Zero) away = new FPVector2(FP.One, FP.Zero);
+                FPVector2 to = a.Position + away * FP.FromInt(SimConstants.FleeDistance);
+                MoveTo(a, to.ToCell());
+            }
         }
     }
 }

@@ -2,16 +2,6 @@ using System.Collections.Generic;
 
 namespace Oduncu.Sim
 {
-    public enum EntityKind : byte
-    {
-        None = 0,
-        Villager = 1,
-        Militia = 2,
-        TownCenter = 3,
-        Barracks = 4,
-        Tree = 5,
-    }
-
     public enum UnitState : byte
     {
         Idle = 0,
@@ -20,91 +10,57 @@ namespace Oduncu.Sim
         Returning = 3,
         Building = 4,
         Attacking = 5,
+        Repairing = 6,
+        /// <summary>A dead animal left on the map as food. Not a valid attack target.</summary>
+        Carcass = 7,
+        /// <summary>Inside a building: off the map, out of the spatial index, safe from attack.</summary>
+        Garrisoned = 8,
+        /// <summary>Walking to a building to garrison in it (TargetId).</summary>
+        Garrisoning = 9,
+        /// <summary>A monk healing a friendly unit (TargetId).</summary>
+        Healing = 10,
     }
 
-    /// <summary>Static, data-driven stats for one entity kind. Later milestones load these from CSV.</summary>
-    public sealed class EntityDef
+    /// <summary>One slot of a production queue: a unit, a tech or an age, and what was paid for it.</summary>
+    public struct QueueItem
     {
-        public EntityKind Kind;
-        public string Name = "";
-        public bool IsUnit;
-        public bool IsBuilding;
-        public bool IsResource;
-        public bool IsMilitary;
-        public bool CanGather;
-        public bool CanBuild;
-        public int MaxHp;
-        public int Attack;
-        public int Armor;
-        /// <summary>Distance from the attacker's centre to the target's nearest point.</summary>
-        public FP Range;
-        public int AttackTicks;
-        /// <summary>Tiles per tick.</summary>
-        public FP Speed;
-        public int LineOfSight;
-        /// <summary>Footprint side length in cells (buildings and resources).</summary>
-        public int Size = 1;
-        public int CostWood;
-        public int TrainTicks;
-        public int BuildTicks;
-        public int Population;
-        public int ResourceAmount;
-        /// <summary>Which kinds this building can train.</summary>
-        public EntityKind[] Trains = System.Array.Empty<EntityKind>();
-        public bool IsDropOff;
-    }
+        /// <summary>The unit being trained, or None for research.</summary>
+        public EntityKind Unit;
+        /// <summary>The tech being researched, or None.</summary>
+        public TechId Tech;
+        /// <summary>The age being researched (Dark means none: nobody researches the Dark Age).</summary>
+        public AgeId Age;
+        /// <summary>The exact price charged when queued, refunded in full on cancel.</summary>
+        public Cost Paid;
 
-    public static class EntityDefs
-    {
-        private static readonly EntityDef[] Table = Build();
+        public bool IsResearch => Unit == EntityKind.None;
+        public bool IsAgeUp => Age != AgeId.Dark;
 
-        public static EntityDef Get(EntityKind kind) => Table[(int)kind];
-
-        private static EntityDef[] Build()
+        public void WriteState(StateHasher h)
         {
-            var t = new EntityDef[6];
-            t[(int)EntityKind.None] = new EntityDef { Kind = EntityKind.None, Name = "None" };
-            t[(int)EntityKind.Villager] = new EntityDef
-            {
-                Kind = EntityKind.Villager, Name = "Villager", IsUnit = true, CanGather = true, CanBuild = true,
-                MaxHp = 25, Attack = 3, Armor = 0, Range = FP.Ratio(16, 10), AttackTicks = 15,
-                Speed = FP.Ratio(8, 100), LineOfSight = 4, CostWood = 50, TrainTicks = 200, Population = 1,
-            };
-            t[(int)EntityKind.Militia] = new EntityDef
-            {
-                Kind = EntityKind.Militia, Name = "Militia", IsUnit = true, IsMilitary = true,
-                MaxHp = 40, Attack = 4, Armor = 1, Range = FP.Ratio(16, 10), AttackTicks = 15,
-                Speed = FP.Ratio(9, 100), LineOfSight = 6, CostWood = 60, TrainTicks = 210, Population = 1,
-            };
-            t[(int)EntityKind.TownCenter] = new EntityDef
-            {
-                Kind = EntityKind.TownCenter, Name = "Town Center", IsBuilding = true, IsDropOff = true,
-                MaxHp = 2400, Armor = 3, Size = 3, LineOfSight = 8, CostWood = 275, BuildTicks = 1500,
-                Trains = new[] { EntityKind.Villager },
-            };
-            t[(int)EntityKind.Barracks] = new EntityDef
-            {
-                Kind = EntityKind.Barracks, Name = "Barracks", IsBuilding = true,
-                MaxHp = 1200, Armor = 2, Size = 3, LineOfSight = 6, CostWood = 175, BuildTicks = 350,
-                Trains = new[] { EntityKind.Militia },
-            };
-            t[(int)EntityKind.Tree] = new EntityDef
-            {
-                Kind = EntityKind.Tree, Name = "Tree", IsResource = true, Size = 1, ResourceAmount = 100,
-            };
-            return t;
+            h.Write((int)Unit);
+            h.Write((int)Tech);
+            h.Write((int)Age);
+            Paid.WriteState(h);
         }
     }
 
     /// <summary>
     /// One thing on the map: a unit, a building or a resource. Plain mutable data; all
     /// behaviour lives in Simulation so the state can be hashed and serialized trivially.
+    /// Entity objects are pooled and reused after death, so hold ids rather than references
+    /// across ticks; Simulation.Find returns null for an id that has died.
     /// </summary>
     public sealed class Entity
     {
+        public const int PathCapacity = 48;
+
         public int Id;
         public EntityKind Kind;
+        /// <summary>Static data for the kind (size, tags, what it trains).</summary>
         public EntityDef Def;
+        /// <summary>The owner's resolved stats for this kind, including researched upgrades.</summary>
+        public UnitStats Stats;
         public int Owner = SimConstants.NeutralOwner;
         public bool Alive = true;
         public int Hp;
@@ -117,32 +73,125 @@ namespace Oduncu.Sim
         // Unit state
         public UnitState State;
         public Cell MoveTarget;
-        public List<Cell> Path;
+        /// <summary>Reused path buffer; only meaningful while HasPath is true.</summary>
+        public readonly List<Cell> Path = new List<Cell>(PathCapacity);
+        public bool HasPath;
         public int PathIndex;
         public Cell PathGoal;
         public int PathAge;
         public int TargetId;
         public int GatherSourceId;
+        /// <summary>Kind of resource last gathered, used to find the next one when it runs out.</summary>
+        public EntityKind GatherKind;
         public int PreviousGatherSourceId;
         public int BuildSiteId;
         public int Carry;
-        public int WorkTimer;
+        public ResourceKind CarryKind = ResourceKind.None;
+        /// <summary>Fraction of the next resource unit gathered so far.</summary>
+        public FP GatherProgress;
         public int Cooldown;
+        /// <summary>Last entity that damaged this one; boar retaliate against it.</summary>
+        public int LastAttackerId;
+        /// <summary>Hold-ground stance: only attack what is already in range and never chase.</summary>
+        public bool HoldGround;
+        /// <summary>The current target was picked by auto-engage rather than ordered.</summary>
+        public bool AutoTarget;
+        /// <summary>Building this unit is garrisoned in, or 0.</summary>
+        public int GarrisonedIn;
+        /// <summary>Ticks a monk has spent converting its current target.</summary>
+        public int ChannelTicks;
+        /// <summary>Group move speed limit (the slowest unit's speed), or zero for none.</summary>
+        public FP SpeedCap;
+        /// <summary>Follow the shared flow field toward FlowGoal until close, then A* to MoveTarget.</summary>
+        public bool UsesFlow;
+        public Cell FlowGoal;
 
         // Building state
         public bool UnderConstruction;
         public int BuildProgress;
-        public List<EntityKind> TrainQueue;
+        public readonly List<QueueItem> TrainQueue = new List<QueueItem>(SimConstants.TrainQueueLength);
         public int TrainProgress;
+        /// <summary>Keep one villager queued while on (Town Center auto-villager toggle).</summary>
+        public bool AutoQueue;
+        public bool HasRally;
+        public Cell RallyCell;
+        /// <summary>Entity the rally point is on (a resource to gather, or a building), or 0 for a plain cell.</summary>
+        public int RallyTargetId;
+        /// <summary>Hit points repaired since the building was last at full health; repair is charged from this.</summary>
+        public int RepairedHp;
+        /// <summary>For farms: the villager working it, so the planner sends one farmer per farm.</summary>
+        public int FarmerId;
+        /// <summary>Units inside this building.</summary>
+        public int GarrisonCount;
+        /// <summary>Bit per player who has seen this building or resource; they keep seeing its last position.</summary>
+        public int SeenBy;
+        /// <summary>Attack-move: fight anything met on the way, then carry on to MoveTarget.</summary>
+        public bool AttackMove;
 
         // Resource state
         public int Amount;
+
+        /// <summary>Bucket in the spatial index, or -1 when not indexed. Not part of the hashed state.</summary>
+        internal int IndexBucket = -1;
 
         public bool IsUnit => Def.IsUnit;
         public bool IsBuilding => Def.IsBuilding;
         public bool IsResource => Def.IsResource;
 
         public CellRect Footprint => new CellRect(Cell.X, Cell.Y, Def.Size);
+
+        /// <summary>Clear every field for reuse from the pool.</summary>
+        internal void Reset(int id, EntityKind kind, EntityDef def, int owner, UnitStats stats)
+        {
+            Id = id;
+            Kind = kind;
+            Def = def;
+            Stats = stats;
+            Owner = owner;
+            Alive = true;
+            Hp = stats.MaxHp;
+            Position = FPVector2.Zero;
+            Cell = default;
+            State = UnitState.Idle;
+            MoveTarget = default;
+            Path.Clear();
+            HasPath = false;
+            PathIndex = 0;
+            PathGoal = default;
+            PathAge = 0;
+            TargetId = 0;
+            GatherSourceId = 0;
+            GatherKind = EntityKind.None;
+            PreviousGatherSourceId = 0;
+            BuildSiteId = 0;
+            Carry = 0;
+            CarryKind = ResourceKind.None;
+            GatherProgress = FP.Zero;
+            Cooldown = 0;
+            LastAttackerId = 0;
+            HoldGround = false;
+            AutoTarget = false;
+            GarrisonedIn = 0;
+            ChannelTicks = 0;
+            SpeedCap = FP.Zero;
+            UsesFlow = false;
+            FlowGoal = default;
+            GarrisonCount = 0;
+            SeenBy = 0;
+            AttackMove = false;
+            UnderConstruction = false;
+            BuildProgress = 0;
+            TrainQueue.Clear();
+            TrainProgress = 0;
+            AutoQueue = false;
+            HasRally = false;
+            RallyCell = default;
+            RallyTargetId = 0;
+            RepairedHp = 0;
+            FarmerId = 0;
+            Amount = 0;
+            IndexBucket = -1;
+        }
 
         public void WriteState(StateHasher h)
         {
@@ -158,21 +207,38 @@ namespace Oduncu.Sim
             h.Write(PathIndex);
             h.Write(TargetId);
             h.Write(GatherSourceId);
+            h.Write((int)GatherKind);
             h.Write(PreviousGatherSourceId);
             h.Write(BuildSiteId);
             h.Write(Carry);
-            h.Write(WorkTimer);
+            h.Write((int)CarryKind);
+            h.Write(GatherProgress);
             h.Write(Cooldown);
+            h.Write(LastAttackerId);
+            h.Write(HoldGround);
+            h.Write(AutoTarget);
+            h.Write(GarrisonedIn);
+            h.Write(ChannelTicks);
+            h.Write(SpeedCap);
+            h.Write(UsesFlow);
+            h.Write(FlowGoal);
+            h.Write(GarrisonCount);
+            h.Write(SeenBy);
+            h.Write(AttackMove);
             h.Write(UnderConstruction);
             h.Write(BuildProgress);
             h.Write(TrainProgress);
+            h.Write(AutoQueue);
+            h.Write(HasRally);
+            h.Write(RallyCell);
+            h.Write(RallyTargetId);
+            h.Write(RepairedHp);
+            h.Write(FarmerId);
             h.Write(Amount);
-            if (TrainQueue != null)
-            {
-                h.Write(TrainQueue.Count);
-                for (int i = 0; i < TrainQueue.Count; i++) h.Write((int)TrainQueue[i]);
-            }
-            if (Path != null)
+            h.Write(TrainQueue.Count);
+            for (int i = 0; i < TrainQueue.Count; i++) TrainQueue[i].WriteState(h);
+            h.Write(HasPath);
+            if (HasPath)
             {
                 h.Write(Path.Count);
                 for (int i = 0; i < Path.Count; i++) h.Write(Path[i]);
@@ -180,17 +246,127 @@ namespace Oduncu.Sim
         }
     }
 
+    /// <summary>Running match totals for one player, shown on the end screen.</summary>
+    public struct MatchScore
+    {
+        public int UnitsKilled;
+        public int UnitsLost;
+        public int BuildingsRazed;
+        public int BuildingsLost;
+        /// <summary>Resources villagers have dropped off, all kinds together.</summary>
+        public int Gathered;
+
+        /// <summary>One number for the end screen: economy plus fighting.</summary>
+        public int Total => Gathered / 10 + UnitsKilled * 20 + BuildingsRazed * 50;
+
+        public void WriteState(StateHasher h)
+        {
+            h.Write(UnitsKilled);
+            h.Write(UnitsLost);
+            h.Write(BuildingsRazed);
+            h.Write(BuildingsLost);
+            h.Write(Gathered);
+        }
+    }
+
     public sealed class PlayerState
     {
+        private static readonly string[] NotEnough = { "not enough food", "not enough wood", "not enough gold", "not enough stone" };
+
         public int Index;
+        public int Food;
         public int Wood;
+        public int Gold;
+        public int Stone;
         public bool Alive = true;
+        public AgeId Age = AgeId.Dark;
+        public CivId Civ = CivId.None;
+        /// <summary>Units alive plus units in production, recounted every tick.</summary>
+        public int Population;
+        /// <summary>Housing from finished buildings, capped at SimConstants.MaxPopulation.</summary>
+        public int PopulationCap;
+        /// <summary>Set once the player has finished a Town Center, Castle or military production building.</summary>
+        public bool HadConquestBuilding;
+        public EconomyTargets EconomyTargets = EconomyTargets.Off;
+        /// <summary>Stats for every entity kind with this player's researched upgrades applied.</summary>
+        public readonly PlayerStats Stats = new PlayerStats();
+        public MatchScore Score;
+
+        public int Get(ResourceKind kind)
+        {
+            switch (kind)
+            {
+                case ResourceKind.Food: return Food;
+                case ResourceKind.Wood: return Wood;
+                case ResourceKind.Gold: return Gold;
+                case ResourceKind.Stone: return Stone;
+                default: return 0;
+            }
+        }
+
+        public void Add(ResourceKind kind, int amount)
+        {
+            switch (kind)
+            {
+                case ResourceKind.Food: Food += amount; break;
+                case ResourceKind.Wood: Wood += amount; break;
+                case ResourceKind.Gold: Gold += amount; break;
+                case ResourceKind.Stone: Stone += amount; break;
+            }
+        }
+
+        public void Set(Cost amounts)
+        {
+            Food = amounts.Food;
+            Wood = amounts.Wood;
+            Gold = amounts.Gold;
+            Stone = amounts.Stone;
+        }
+
+        public bool CanAfford(Cost cost) => Food >= cost.Food && Wood >= cost.Wood && Gold >= cost.Gold && Stone >= cost.Stone;
+
+        /// <summary>The rejection message for the first resource (food, wood, gold, stone) that is short, or null.</summary>
+        public string ShortageMessage(Cost cost)
+        {
+            if (Food < cost.Food) return NotEnough[0];
+            if (Wood < cost.Wood) return NotEnough[1];
+            if (Gold < cost.Gold) return NotEnough[2];
+            if (Stone < cost.Stone) return NotEnough[3];
+            return null;
+        }
+
+        public void Pay(Cost cost)
+        {
+            Food -= cost.Food;
+            Wood -= cost.Wood;
+            Gold -= cost.Gold;
+            Stone -= cost.Stone;
+        }
+
+        public void Refund(Cost cost)
+        {
+            Food += cost.Food;
+            Wood += cost.Wood;
+            Gold += cost.Gold;
+            Stone += cost.Stone;
+        }
 
         public void WriteState(StateHasher h)
         {
             h.Write(Index);
+            h.Write(Food);
             h.Write(Wood);
+            h.Write(Gold);
+            h.Write(Stone);
             h.Write(Alive);
+            h.Write((int)Age);
+            h.Write((int)Civ);
+            h.Write(Population);
+            h.Write(PopulationCap);
+            h.Write(HadConquestBuilding);
+            EconomyTargets.WriteState(h);
+            Stats.WriteState(h);
+            Score.WriteState(h);
         }
     }
 }

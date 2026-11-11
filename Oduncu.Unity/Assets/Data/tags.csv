@@ -1,0 +1,26 @@
+# Entity tags. Ids are bit positions in the generated EntityTag flags enum; never renumber.
+Id,Key,Meaning
+0,military,Auto-engages enemies and counts as army
+1,gatherer,Can gather resources
+2,builder,Can construct and repair buildings
+3,infantry,Infantry line (Barracks)
+4,cavalry,Cavalry line (Stable)
+5,archer,Archer line (Archery Range)
+6,siege,Siege weapons
+7,monk,Monks
+8,dropoff_food,Accepts food
+9,dropoff_wood,Accepts wood
+10,dropoff_gold,Accepts gold
+11,dropoff_stone,Accepts stone
+12,animal,Wild or herdable animal; never counts as population or army
+13,herdable,Owned by whoever's units are nearby (sheep)
+14,flees,Runs from nearby units (deer)
+15,retaliates,Attacks whatever hurt it (boar)
+16,building,Added by the generator to every building; bonus damage vs buildings targets it
+17,spear,Spear line
+18,skirmisher,Skirmisher line
+19,targets_buildings,Can only attack buildings (rams and trebuchets)
+20,conquest,A player keeps playing while they own one of these finished (design section 3)
+21,shoots,Building that fires arrows at enemies in range
+22,wall,Wall segments and gates; not counted for age requirements or conquest
+23,gate,Wall segment the owner's units walk through

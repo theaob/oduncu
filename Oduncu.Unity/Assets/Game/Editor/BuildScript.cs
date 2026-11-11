@@ -20,6 +20,7 @@ namespace Oduncu.Game.Editor
         public static void BuildAndroid()
         {
             if (!File.Exists(SceneBootstrap.ScenePath)) SceneBootstrap.CreateMainScene();
+            ProjectSetup.Apply();
 
             PlayerSettings.SetApplicationIdentifier(BuildTargetGroup.Android, BundleId);
             PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel28;

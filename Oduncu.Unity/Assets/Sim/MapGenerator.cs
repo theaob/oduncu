@@ -11,6 +11,7 @@ namespace Oduncu.Sim
         public static Simulation CreateDefault(int seed)
         {
             var sim = new Simulation(DefaultSize, DefaultSize, 2, (ulong)seed);
+            for (int p = 0; p < sim.Players.Length; p++) sim.SetCivilization(p, CivId.Woodlanders);
             var rng = new DeterministicRandom((ulong)seed * 7919UL + 17UL);
 
             PlaceBase(sim, 0, new Cell(4, 4), mirror: false);

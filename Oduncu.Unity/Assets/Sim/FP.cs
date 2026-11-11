@@ -116,8 +116,8 @@ namespace Oduncu.Sim
         public int CompareTo(FP other) => Raw.CompareTo(other.Raw);
 
         /// <summary>For presentation and debugging only. Never feed the result back into the simulation.</summary>
-        public float AsFloat => (float)Raw / OneRaw;
-        public double AsDouble => (double)Raw / OneRaw;
+        public float AsFloat => (float)Raw / OneRaw; // banned-api-ok: presentation and logging only
+        public double AsDouble => (double)Raw / OneRaw; // banned-api-ok: presentation and logging only
 
         public override string ToString() => AsDouble.ToString("0.####", CultureInfo.InvariantCulture);
     }

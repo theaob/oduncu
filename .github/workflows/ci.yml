@@ -22,8 +22,14 @@ jobs:
       - name: Build
         run: dotnet build Oduncu.Sim.Tests/Oduncu.Sim.Tests.csproj --no-restore -c Release
 
+      - name: Check generated data is current
+        run: dotnet run --project tools/DataGen -- -check
+
       - name: Test
-        run: dotnet test Oduncu.Sim.Tests/Oduncu.Sim.Tests.csproj --no-build -c Release --logger "trx;LogFileName=sim-tests.trx"
+        run: dotnet test Oduncu.Sim.Tests/Oduncu.Sim.Tests.csproj --no-build -c Release --filter "TestCategory!=Benchmark" --logger "trx;LogFileName=sim-tests.trx"
+
+      - name: Benchmark (report only)
+        run: dotnet test Oduncu.Sim.Tests/Oduncu.Sim.Tests.csproj --no-build -c Release --filter "TestCategory=Benchmark" --logger "console;verbosity=detailed"
 
       - name: Upload test results
         if: always()
@@ -31,6 +37,19 @@ jobs:
         with:
           name: sim-test-results
           path: Oduncu.Sim.Tests/TestResults/*.trx
+
+  game-compile:
+    name: Game scripts compile (reference assemblies)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Compile Assets/Game against Unity reference assemblies
+        run: tools/GameCompileCheck/check.sh
 
   android-build:
     name: Android build (Unity)
